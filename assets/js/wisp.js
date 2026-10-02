@@ -1,13 +1,13 @@
 /**
  * cherri wisp helper
  *
- * Every proxied request goes through the bare-mux "libcurl" transport, which tunnels
- * all traffic over a single wisp WebSocket server. When that server is unreachable
+ * Every proxied request goes through the libcurl transport, which tunnels all
+ * traffic over a single wisp WebSocket server. When that server is unreachable
  * libcurl aborts the socket and rejects with:
  *
  *   TypeError: Request failed with error code 7: Could not connect to server
  *
- * (curl error 7 == CURLE_COULDNT_CONNECT, thrown from libcurl/index.mjs request_async).
+ * (curl error 7 == CURLE_COULDNT_CONNECT, thrown from the transport's request()).
  *
  * This module owns everything about picking a wisp server that actually answers, so
  * callers never hand libcurl a dead endpoint:
@@ -22,8 +22,6 @@
  */
 (function (global) {
   "use strict";
-
-  const LIBCURL_TRANSPORT = "/libcurl/index.mjs";
 
   /**
    * Fallback pool, tried in order when the configured server does not answer.
@@ -501,16 +499,16 @@
   }
 
   /**
-   * Point bare-mux at the libcurl transport using a wisp server that answers.
+   * Point the transport at a wisp server that answers.
    *
-   * @param {{ setTransport: Function }} connection a BareMux.BareMuxConnection
+   * @param {{ setTransport: (url: string) => Promise<void> }} target whatever owns the transport
    * @param {{ force?: boolean, timeoutMs?: number, concurrency?: number, maxWaitMs?: number, exclude?: string[], onStatus?: Function }} [options]
    * @returns {Promise<string>} the endpoint now in use
    */
-  async function configureTransport(connection, options) {
+  async function configureTransport(target, options) {
     const opts = options || {};
-    if (!connection || typeof connection.setTransport !== "function") {
-      throw new Error("No bare-mux connection was given to configureTransport().");
+    if (!target || typeof target.setTransport !== "function") {
+      throw new Error("No transport target was given to configureTransport().");
     }
 
     const server = await getWorkingWispServer(opts);
@@ -524,7 +522,7 @@
       throw error;
     }
 
-    await connection.setTransport(LIBCURL_TRANSPORT, [{ websocket: server.url }]);
+    await target.setTransport(server.url);
     return server.url;
   }
 
@@ -574,7 +572,6 @@
   global.CherriWisp = {
     PRESETS,
     KEYS,
-    LIBCURL_TRANSPORT,
     DEFAULT_URL,
     normalizeWispUrl,
     getConfiguredUrl,

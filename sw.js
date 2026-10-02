@@ -7,69 +7,10 @@ if (navigator.userAgent.includes("Firefox")) {
 
 // s16 asked me to credit swium, so here you go. happy now?
 
-importScripts("/homework/math.all.js");
-
-const { ScramjetServiceWorker } = $scramjetLoadWorker();
-const scramjet = new ScramjetServiceWorker();
-
-// Scramjet loads its cookie jar from IndexedDB asynchronously. Waiting for the
-// same record here prevents the first request after a refresh from racing that
-// load and accidentally looking logged out.
-let cookieJarReady;
-function waitForCookieJar() {
-	if (cookieJarReady) return cookieJarReady;
-
-	cookieJarReady = new Promise((resolve) => {
-		let request;
-		try {
-			request = indexedDB.open("$scramjet", 1);
-		} catch (error) {
-			resolve();
-			return;
-		}
-
-		request.onerror = () => resolve();
-		request.onsuccess = () => {
-			const db = request.result;
-			if (!db.objectStoreNames.contains("cookies")) {
-				db.close();
-				resolve();
-				return;
-			}
-
-			try {
-				const get = db
-					.transaction("cookies", "readonly")
-					.objectStore("cookies")
-					.get("cookies");
-				get.onerror = () => {
-					db.close();
-					resolve();
-				};
-				get.onsuccess = () => {
-					try {
-						if (
-							get.result &&
-							scramjet.cookieStore &&
-							typeof scramjet.cookieStore.load === "function"
-						) {
-							scramjet.cookieStore.load(get.result);
-						}
-					} catch (error) {
-						console.warn("[cherri] could not restore the saved cookie jar:", error);
-					}
-					db.close();
-					resolve();
-				};
-			} catch (error) {
-				db.close();
-				resolve();
-			}
-		};
-	});
-
-	return cookieJarReady;
-}
+// Scramjet's service worker half. Proxied requests are routed back to the page
+// that owns the frame, and the cookie jar lives with that page too, so nothing
+// proxy related is kept in here.
+importScripts("/homework/chemistry.sw.js");
 
 const CONFIG = {
 	blocked: [
@@ -134,13 +75,7 @@ const CONFIG = {
 		"*/affiliates/*",
 		"*/partnerads/*",
 	],
-	inject: {
-		html: "\x3c!-- pr0x1ed by vapor's static sj --\x3e",
-	},
 };
-
-/** @type {{ origin: string, html: string, css: string, js: string } | undefined} */
-let playgroundData;
 
 /**
  * @param {string} pattern
@@ -182,14 +117,6 @@ function isBlocked(hostname, pathname) {
 }
 
 /**
- * @param {string} html
- * @returns {string}
- */
-function inject(html) {
-	return html.replace(/<head[^>]*>/i, (match) => `${match}${CONFIG.inject.html}`);
-}
-
-/**
  * @param {string} value
  * @returns {string}
  */
@@ -220,6 +147,24 @@ function proxiedTarget(requestUrl) {
 	const scheme = path.match(/(^|\/)[a-z][a-z0-9+.-]*:\/\//i);
 
 	return scheme ? path.slice(scheme.index + scheme[1].length) : path;
+}
+
+/**
+ * The ad list is checked here rather than in the page, so a blocked request never
+ * has to travel through the frame and back.
+ *
+ * @param {string} requestUrl
+ * @returns {URL|null} the blocked destination, when there is one
+ */
+function blockedTarget(requestUrl) {
+	const target = proxiedTarget(requestUrl).split("#")[0];
+
+	try {
+		const parsed = new URL(target);
+		return isBlocked(parsed.hostname, parsed.pathname) ? parsed : null;
+	} catch (error) {
+		return null;
+	}
 }
 
 /**
@@ -384,46 +329,35 @@ async function findTransportError(response) {
  * @returns {Promise<Response>}
  */
 async function handleRequest(event) {
-	await scramjet.loadConfig();
-	await waitForCookieJar();
+	const blocked = blockedTarget(event.request.url);
 
-	if (scramjet.route(event)) {
-		let response;
-
-		try {
-			response = await scramjet.fetch(event);
-		} catch (error) {
-			console.error("[cherri] proxy fetch failed:", error);
-			return transportErrorPage(event, error);
-		}
-
-		const renderedTransportError = await findTransportError(response);
-		if (renderedTransportError) {
-			console.error("[cherri] proxy destination request failed:", renderedTransportError);
-			return transportErrorPage(event, new Error(renderedTransportError));
-		}
-
-		const contentType = response.headers.get("content-type") || "";
-
-		if (contentType.includes("text/html")) {
-			const originalText = await response.text();
-			const modifiedHtml = inject(originalText);
-			const encoder = new TextEncoder();
-			const byteLength = encoder.encode(modifiedHtml).length;
-			const newHeaders = new Headers(response.headers);
-			newHeaders.set("content-length", byteLength.toString());
-
-			return new Response(modifiedHtml, {
-				status: response.status,
-				statusText: response.statusText,
-				headers: newHeaders,
-			});
-		}
-
-		return response;
+	if (blocked) {
+		return new Response("Site Blocked", {
+			status: 403,
+			headers: { "content-type": "text/plain; charset=utf-8" },
+		});
 	}
 
-	return fetch(event.request);
+	if (!$scramjetController.shouldRoute(event)) {
+		return fetch(event.request);
+	}
+
+	let response;
+
+	try {
+		response = await $scramjetController.route(event);
+	} catch (error) {
+		console.error("[cherri] proxy fetch failed:", error);
+		return transportErrorPage(event, error);
+	}
+
+	const renderedTransportError = await findTransportError(response);
+	if (renderedTransportError) {
+		console.error("[cherri] proxy destination request failed:", renderedTransportError);
+		return transportErrorPage(event, new Error(renderedTransportError));
+	}
+
+	return response;
 }
 
 self.addEventListener("fetch", (event) => {
@@ -436,47 +370,4 @@ self.addEventListener("fetch", (event) => {
 	event.respondWith(handleRequest(event));
 });
 
-self.addEventListener("message", ({ data }) => {
-	if (data.type === "playgroundData") {
-		playgroundData = data;
-	}
-});
-
-scramjet.addEventListener("request", (e) => {
-	if (isBlocked(e.url.hostname, e.url.pathname)) {
-		e.response = new Response("Site Blocked", { status: 403 });
-		return;
-	}
-
-	if (playgroundData && e.url.href.startsWith(playgroundData.origin)) {
-		const routes = {
-			"/": { content: playgroundData.html, type: "text/html" },
-			"/style.css": { content: playgroundData.css, type: "text/css" },
-			"/script.js": { content: playgroundData.js, type: "application/javascript" },
-		};
-
-		const route = routes[e.url.pathname];
-
-		if (route) {
-			let content = route.content;
-
-			if (route.type === "text/html") {
-				content = inject(content);
-			}
-
-			const headers = { "content-type": route.type };
-			e.response = new Response(content, { headers });
-			e.response.rawHeaders = headers;
-			e.response.rawResponse = {
-				body: e.response.body,
-				headers: headers,
-				status: e.response.status,
-				statusText: e.response.statusText,
-			};
-			e.response.finalURL = e.url.toString();
-		} else {
-			e.response = new Response("empty response", { headers: {} });
-		}
-	}
-});
 

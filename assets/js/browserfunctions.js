@@ -1,6 +1,7 @@
 let aTab = 0;
 let tabCounter = 1;
 let bTabs = [];
+// bare-mux is only used by the Ultraviolet backend now
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 
 let searchE;
@@ -20,34 +21,127 @@ if (se === "DuckDuckGo") {
   searchE = "https://search.brave.com/search?q=";
 }
 
-const CONFIG = {
-  files: {
-    wasm: "/homework/history.wasm.wasm",
-    all: "/homework/math.all.js",
-    sync: "/homework/science.sync.js",
-  },
+/**
+ * Where the bundled Scramjet build keeps its parts. These are the names the
+ * files were already served under, so nothing new stands out.
+ */
+const SCRAMJET_CONFIG = {
+  prefix: "/~/sj/",
+  scramjetPath: "/homework/math.all.js",
+  injectPath: "/homework/science.sync.js",
+  wasmPath: "/homework/history.wasm.wasm",
+  virtualWasmPath: "scramjet.wasm.js",
 };
 
-const { ScramjetController } = $scramjetLoadController();
-const scramjet = new ScramjetController({
-  files: CONFIG.files,
-});
-
-// Do not start the first page until Scramjet has finished opening its cookie
-// database. Otherwise a login page can make its first requests before the saved
-// session/CSRF cookies have been loaded.
-const scramjetReady = scramjet.init();
 const serviceWorkerReady =
   "serviceWorker" in navigator
     ? navigator.serviceWorker.ready
     : Promise.resolve();
 
-/** Endpoint bare-mux is currently wired to, once the transport is up. */
+/** Wisp endpoint the transport is currently connected to. */
 let wispUrl = null;
 let transportPromise = null;
+let transportClassPromise = null;
+let scramjetController = null;
+let scramjetControllerPromise = null;
 const scramjetFrames = new Map();
 const recoveryAttempts = new Map();
 let recoveryPromise = null;
+
+/**
+ * The libcurl transport only ships as an ES module, so it is pulled in on demand
+ * instead of with a script tag.
+ *
+ * @returns {Promise<Function>} the transport class
+ */
+function loadTransportClass() {
+  transportClassPromise ||= import("/libcurl/libcurl.mjs").then(
+    (module) => module.default || module.LibcurlClient
+  );
+
+  return transportClassPromise;
+}
+
+/**
+ * @param {string} server wisp endpoint
+ * @returns {Promise<object>} a transport wired to that endpoint
+ */
+async function createTransport(server) {
+  const LibcurlClient = await loadTransportClass();
+
+  return new LibcurlClient({ wisp: server });
+}
+
+/**
+ * Scramjet is driven from this page now: the service worker only forwards
+ * proxied requests to a controller created here, so it has to exist before the
+ * first navigation. Cookie state lives with the controller too, which is why it
+ * waits for its IndexedDB record before a login page can make its first request.
+ *
+ * @returns {Promise<object>} the page side Scramjet controller
+ */
+function initScramjetController() {
+  scramjetControllerPromise ||= (async () => {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+
+    const sw =
+      navigator.serviceWorker.controller ||
+      registration.active ||
+      registration.waiting;
+
+    if (!sw) {
+      throw new Error(
+        "Scramjet needs a controlling service worker, but none became active."
+      );
+    }
+
+    const controller = new $scramjetController.Controller({
+      serviceworker: sw,
+      transport: await createTransport(CherriWisp.getConfiguredUrl()),
+      config: SCRAMJET_CONFIG,
+    });
+
+    await controller.wait();
+    scramjetController = controller;
+
+    return controller;
+  })().catch((error) => {
+    // do not cache the failure, a later tab should be able to retry
+    scramjetControllerPromise = null;
+    throw error;
+  });
+
+  return scramjetControllerPromise;
+}
+
+/**
+ * Every tab gets its own Scramjet frame, registered the first time it is needed.
+ *
+ * @param {number} tabId
+ * @param {HTMLIFrameElement} [element]
+ * @returns {Promise<object>} the frame for that tab
+ */
+async function scramjetFrameFor(tabId, element) {
+  const controller = await initScramjetController();
+  let frame = scramjetFrames.get(tabId);
+
+  if (!frame && element) {
+    frame = controller.createFrame(element);
+    scramjetFrames.set(tabId, frame);
+  }
+
+  return frame;
+}
+
+/** CherriWisp points a wisp server that answered at whatever transport is in use. */
+const transportTarget = {
+  async setTransport(server) {
+    const controller = await initScramjetController();
+
+    controller.setTransport(await createTransport(server));
+  },
+};
 
 /**
  * Make sure the libcurl transport is attached to a wisp server that actually
@@ -64,7 +158,7 @@ function ensureTransport(force, options) {
     return transportPromise;
   }
 
-  transportPromise = CherriWisp.configureTransport(connection, {
+  transportPromise = CherriWisp.configureTransport(transportTarget, {
     force,
     exclude: options && options.exclude,
     onStatus: (status) => {
@@ -96,19 +190,13 @@ ensureTransport().catch((error) => {
 });
 
 /**
- * @param {string} url
- * @returns {string} the proxied URL for whichever backend is configured
+ * @returns {boolean} whether the older Ultraviolet backend is the one in use
  */
-function encodeForBackend(url) {
-  const backend = (
-    localStorage.getItem("cherri_backend") || "Scramjet"
-  ).toLowerCase();
-
-  if (backend === "ultraviolet" && typeof __uv$config !== "undefined") {
-    return __uv$config.prefix + __uv$config.encodeUrl(url);
-  }
-
-  return scramjet.encodeUrl(url);
+function isUltravioletBackend() {
+  return (
+    (localStorage.getItem("cherri_backend") || "").toLowerCase() ===
+      "ultraviolet" && typeof __uv$config !== "undefined"
+  );
 }
 
 function newTab() {
@@ -158,8 +246,13 @@ function newTab() {
 
   // Register the iframe with Scramjet instead of treating it as an unrelated
   // iframe. This gives Scramjet the frame metadata it needs for correct origin,
-  // referrer, cookie and login handling.
-  scramjetFrames.set(nTab.id, scramjet.createFrame(tabFrame));
+  // referrer, cookie and login handling. The controller needs a live service
+  // worker first, so this happens as soon as it is ready and navigation waits
+  // for it anyway.
+  scramjetFrameFor(nTab.id, tabFrame).catch((error) => {
+    console.error("[cherri] could not register the tab with Scramjet:", error);
+  });
+
   tabFrame.src = "/newtab.html";
 
   document.body.appendChild(tabFrame);
@@ -232,7 +325,7 @@ function nav(i) {
 
   cTab.url = url;
 
-  go(encodeForBackend(url));
+  go(url);
 }
 
 function updateUrlFromIframe(viewframe) {
@@ -243,16 +336,23 @@ function updateUrlFromIframe(viewframe) {
     let decodedUrl;
     const currentSrc = viewframe.src;
 
-    if (
-      (localStorage.getItem("cherri_backend") || "").toLowerCase() ===
-        "ultraviolet" &&
-      typeof __uv$config !== "undefined"
-    ) {
+    if (isUltravioletBackend()) {
       if (currentSrc.includes("/uv/service/")) {
         decodedUrl = __uv$config.decodeUrl(currentSrc.split("/uv/service/")[1]);
       }
     } else {
-      decodedUrl = scramjet.decodeUrl(currentSrc);
+      // every Scramjet frame has its own prefix, so strip it and decode the rest
+      const frame = scramjetFrames.get(cTab.id);
+
+      if (frame && currentSrc.startsWith(frame.prefix)) {
+        try {
+          decodedUrl = decodeURIComponent(
+            currentSrc.slice(frame.prefix.length)
+          );
+        } catch (e) {
+          decodedUrl = currentSrc.slice(frame.prefix.length);
+        }
+      }
     }
 
     if (decodedUrl && decodedUrl !== cTab.url) {
@@ -270,7 +370,7 @@ function updateUrlFromIframe(viewframe) {
   }
 }
 
-async function go(u) {
+async function go(target) {
   const cTab = bTabs.find((t) => t.id === aTab);
   const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`);
   const viewframe = document.querySelector(
@@ -292,10 +392,14 @@ async function go(u) {
     favEl.src = `https://www.google.com/s2/favicons?domain=${favUrl}&sz=256`;
 
   try {
-    // Wait for every side of the proxy to be ready. In particular, Scramjet
-    // needs its IndexedDB cookie jar and service worker ready before a login
-    // page makes its first requests.
-    await Promise.all([scramjetReady, serviceWorkerReady, ensureTransport()]);
+    // Wait for every side of the proxy to be ready: the service worker that
+    // serves the frame, the Scramjet controller in this page, and a wisp server
+    // that answered a handshake.
+    await Promise.all([
+      initScramjetController(),
+      serviceWorkerReady,
+      ensureTransport(),
+    ]);
   } catch (error) {
     console.error("[cherri] proxy transport unavailable:", error);
     setTabError(CherriWisp.describeError(error));
@@ -303,8 +407,6 @@ async function go(u) {
   }
 
   try {
-    viewframe.src = u;
-
     viewframe.onload = () => {
       try {
         const iframeDoc =
@@ -345,6 +447,19 @@ async function go(u) {
         updateUrlFromIframe(viewframe);
       }
     };
+
+    if (isUltravioletBackend()) {
+      // Ultraviolet still talks through bare-mux, so it keeps the old transport
+      if (!(await connection.getTransport())) {
+        await connection.setTransport("/libcurl/index.mjs", [
+          { websocket: await ensureTransport() },
+        ]);
+      }
+
+      viewframe.src = __uv$config.prefix + __uv$config.encodeUrl(target);
+    } else {
+      (await scramjetFrameFor(aTab, viewframe)).go(target);
+    }
   } catch (e) {
     console.error("There was an error while loading the page:", e);
     setTabError(CherriWisp.describeError(e));
@@ -426,7 +541,7 @@ async function handleProxyFailure(message) {
       if (currentTab && currentTab.url === target) {
         // The new transport is ready. Reload only this failed tab, not the
         // whole cherri page, so other tabs and their sessions stay intact.
-        viewframe.src = encodeForBackend(target);
+        go(target);
       }
     })
     .catch((error) => {
@@ -450,7 +565,7 @@ function b() {
   const u = cTab.history[cTab.historyIndex];
   cTab.url = u;
 
-  go(encodeForBackend(u));
+  go(u);
 }
 
 function f() {
@@ -461,7 +576,7 @@ function f() {
   const u = cTab.history[cTab.historyIndex];
   cTab.url = u;
 
-  go(encodeForBackend(u));
+  go(u);
 }
 
 function r() {
@@ -514,7 +629,7 @@ async function launchEruda() {
 }
 
 async function fixProxy() {
-  await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+  await ensureTransport(true);
 
   showToast("success", "Connection reset to Libcurl!", "fas fa-check-circle")
   console.log(
