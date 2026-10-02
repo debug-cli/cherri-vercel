@@ -280,26 +280,42 @@
         let res
 
         async function getJson() {
-            res = await fetch('/assets/json/classplay.json');
-            data = await res.json();
+            // Follow whichever store the Games menu is set to. Both Classplay
+            // (UCP) and GN-Math ship in this repository and use the same listing
+            // shape, so the standalone page matches the home page menu.
+            const store = (localStorage.getItem('cherri_gameStore') || 'Classplay').toLowerCase();
+            res = await fetch(`/assets/json/${store}.json`);
+            if (!res.ok) throw new Error(`Games could not be loaded (${res.status})`);
+            return res.json();
         }
 
         function loadApps() {
-            getJson().then(() => {
-                data.forEach(app => {
+            getJson().then(games => {
+                games.forEach(game => {
                     const appDiv = document.createElement('div');
                     appDiv.classList.add('app');
 
                     appDiv.innerHTML = `
-                    <div class="app-img" style="background: url('${app.image}');" onclick="window.location.href = '/pages/play.html?launch=${app.url}&name=${app.name}&img=${app.image}'"></div>
+                        <div class="app-img"></div>
                         <div class="title">
-                        <h2 class="h2-title">${app.name}</h2>
-                    </div>
+                            <h2 class="h2-title"></h2>
+                        </div>
                     `;
+
+                    const image = appDiv.querySelector('.app-img');
+                    const title = appDiv.querySelector('.h2-title');
+                    image.style.backgroundImage = `url("${game.img}")`;
+                    title.textContent = game.name;
+                    image.addEventListener('click', () => {
+                        window.location.href = `/pages/play.html?launch=${encodeURIComponent(game.url)}`;
+                    });
 
                     acont.appendChild(appDiv);
                 });
-            })
+            }).catch(error => {
+                console.error('[cherri] games page failed to load:', error);
+                acont.innerHTML = '<p>Games are temporarily unavailable. Reload to try again.</p>';
+            });
         }
 
         loadApps()

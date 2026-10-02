@@ -10,10 +10,13 @@
     <link rel="stylesheet" href="/assets/css/elements.css">
     <link rel="stylesheet" href="/assets/css/font.css">
     <link rel="stylesheet" href="/assets/icons/fonts/remixicon.css">
+    <link rel="stylesheet" href="/assets/css/t.css">
     <script src="/assets/js/lib/particles.js"></script>
     <script src="/baremux/index.js"></script>
     <script src="/assets/js/colors.js"></script>
     <script src="/homework/math.all.js"></script>
+    <script src="/assets/js/wisp.js"></script>
+    <script src="/assets/js/t.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.min.js"></script>
     <script>
         async function swium() {
@@ -292,7 +295,8 @@
         function rSearch(input) {
             newTab()
 
-            let url = input;
+            let url = (input || "").trim();
+            if (!url) return;
             if (!url.includes(".") || url.includes(" ")) {
                 url = "https://search.brave.com/search?q=" + url;
             } else {
@@ -329,7 +333,9 @@
         const params = new URLSearchParams(window.location.search)
         
         async function waitThenSearch() {
-            await connection.setTransport("/libcurl/index.mjs", [{ websocket: localStorage.getItem("cherri_wispUrl") ?? "wss://wisp.rhw.one/" }])
+            // resolve + health check a wisp server before proxying anything; if
+            // every server is down, go() below reports it on the tab
+            await ensureTransport().catch(() => { })
 
             rSearch(params.get("launch"))
         }

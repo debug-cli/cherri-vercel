@@ -2,8 +2,6 @@ let aTab = 0;
 let tabCounter = 1;
 let bTabs = [];
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-const wispUrl = localStorage.getItem("cherri_wispUrl") || "wss://wisp.rhw.one/";
-const bareUrl = "https://useclassplay.vercel.app/fq/";
 
 let searchE;
 const se = localStorage.getItem("cherri_searchEngine") || "DuckDuckGo";
@@ -22,8 +20,6 @@ if (se === "DuckDuckGo") {
   searchE = "https://search.brave.com/search?q=";
 }
 
-connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
-
 const CONFIG = {
   files: {
     wasm: "/homework/history.wasm.wasm",
@@ -36,7 +32,84 @@ const { ScramjetController } = $scramjetLoadController();
 const scramjet = new ScramjetController({
   files: CONFIG.files,
 });
-scramjet.init();
+
+// Do not start the first page until Scramjet has finished opening its cookie
+// database. Otherwise a login page can make its first requests before the saved
+// session/CSRF cookies have been loaded.
+const scramjetReady = scramjet.init();
+const serviceWorkerReady =
+  "serviceWorker" in navigator
+    ? navigator.serviceWorker.ready
+    : Promise.resolve();
+
+/** Endpoint bare-mux is currently wired to, once the transport is up. */
+let wispUrl = null;
+let transportPromise = null;
+const scramjetFrames = new Map();
+const recoveryAttempts = new Map();
+let recoveryPromise = null;
+
+/**
+ * Make sure the libcurl transport is attached to a wisp server that actually
+ * answers before anything is proxied through it. A dead server is what produces
+ * "Request failed with error code 7: Could not connect to server" from libcurl, so
+ * the endpoint is health checked (and failed over) here instead of at request time.
+ *
+ * @param {boolean} [force] re-probe even when a server already passed
+ * @param {{ exclude?: string[] }} [options]
+ * @returns {Promise<string>} the endpoint in use
+ */
+function ensureTransport(force, options) {
+  if (transportPromise && !force && !(options && options.exclude?.length)) {
+    return transportPromise;
+  }
+
+  transportPromise = CherriWisp.configureTransport(connection, {
+    force,
+    exclude: options && options.exclude,
+    onStatus: (status) => {
+      if (status.phase === "failed") {
+        console.warn(
+          `[cherri] wisp server ${status.result.url} is unreachable (${status.result.reason})`
+        );
+      }
+    },
+  })
+    .then((url) => {
+      wispUrl = url;
+      return url;
+    })
+    .catch((error) => {
+      transportPromise = null;
+      throw error;
+    });
+
+  return transportPromise;
+}
+
+// warm the transport up on load so the first navigation does not pay for it
+ensureTransport().catch((error) => {
+  console.error("[cherri] proxy transport unavailable:", error);
+  if (typeof showToast === "function") {
+    showToast("error", CherriWisp.describeError(error), "triangle-exclamation");
+  }
+});
+
+/**
+ * @param {string} url
+ * @returns {string} the proxied URL for whichever backend is configured
+ */
+function encodeForBackend(url) {
+  const backend = (
+    localStorage.getItem("cherri_backend") || "Scramjet"
+  ).toLowerCase();
+
+  if (backend === "ultraviolet" && typeof __uv$config !== "undefined") {
+    return __uv$config.prefix + __uv$config.encodeUrl(url);
+  }
+
+  return scramjet.encodeUrl(url);
+}
 
 function newTab() {
   const tabCont = document.querySelector(".tabs");
@@ -82,6 +155,11 @@ function newTab() {
   tabFrame.classList.add("viewframe", "browser-frame");
   tabFrame.dataset.frameId = nTab.id;
   tabFrame.setAttribute("allowfullscreen", "true");
+
+  // Register the iframe with Scramjet instead of treating it as an unrelated
+  // iframe. This gives Scramjet the frame metadata it needs for correct origin,
+  // referrer, cookie and login handling.
+  scramjetFrames.set(nTab.id, scramjet.createFrame(tabFrame));
   tabFrame.src = "/newtab.html";
 
   document.body.appendChild(tabFrame);
@@ -123,6 +201,7 @@ function closeTab(tId) {
 
   if (tEl) tEl.remove();
   if (frame) frame.remove();
+  scramjetFrames.delete(tId);
 
   if (aTab === tId) {
     const newATab = bTabs[Math.max(0, tIndex - 1)];
@@ -133,8 +212,7 @@ function closeTab(tId) {
 }
 
 function nav(i) {
-  console.log("e");
-  if (!i.trim()) return;
+  if (typeof i !== "string" || !i.trim()) return;
 
   let url = i.trim();
 
@@ -154,19 +232,7 @@ function nav(i) {
 
   cTab.url = url;
 
-  if (
-    localStorage.getItem("cherri_backend") === "Scramjet" ||
-    localStorage.getItem("cherri_backend") === "scramjet" ||
-    !localStorage.getItem("cherri_backend")
-  ) {
-    fUrl = scramjet.encodeUrl(url);
-  } else if (localStorage.getItem("cherri_backend") === "Ultraviolet") {
-    fUrl = "/uv/service/" + __uv$config.encodeUrl(url);
-  } else {
-    fUrl = scramjet.encodeUrl(url);
-  }
-
-  go(fUrl);
+  go(encodeForBackend(url));
 }
 
 function updateUrlFromIframe(viewframe) {
@@ -177,7 +243,11 @@ function updateUrlFromIframe(viewframe) {
     let decodedUrl;
     const currentSrc = viewframe.src;
 
-    if (localStorage.getItem("cherri_backend") === "Ultraviolet") {
+    if (
+      (localStorage.getItem("cherri_backend") || "").toLowerCase() ===
+        "ultraviolet" &&
+      typeof __uv$config !== "undefined"
+    ) {
       if (currentSrc.includes("/uv/service/")) {
         decodedUrl = __uv$config.decodeUrl(currentSrc.split("/uv/service/")[1]);
       }
@@ -201,11 +271,6 @@ function updateUrlFromIframe(viewframe) {
 }
 
 async function go(u) {
-  if (!(await connection.getTransport())) {
-    connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
-  }
-
-  console.log("a");
   const cTab = bTabs.find((t) => t.id === aTab);
   const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`);
   const viewframe = document.querySelector(
@@ -227,13 +292,39 @@ async function go(u) {
     favEl.src = `https://www.google.com/s2/favicons?domain=${favUrl}&sz=256`;
 
   try {
+    // Wait for every side of the proxy to be ready. In particular, Scramjet
+    // needs its IndexedDB cookie jar and service worker ready before a login
+    // page makes its first requests.
+    await Promise.all([scramjetReady, serviceWorkerReady, ensureTransport()]);
+  } catch (error) {
+    console.error("[cherri] proxy transport unavailable:", error);
+    setTabError(CherriWisp.describeError(error));
+    return;
+  }
+
+  try {
     viewframe.src = u;
-    console.log("ooooo");
 
     viewframe.onload = () => {
       try {
         const iframeDoc =
           viewframe.contentDocument || viewframe.contentWindow.document;
+
+        // sw.js stamps the page it renders when the proxy server is unreachable,
+        // which is how a server that dies mid-session gets noticed
+        if (iframeDoc && iframeDoc.documentElement) {
+          const marker = iframeDoc.documentElement.dataset;
+          if (marker && marker.cherriProxyError) {
+            const detail = iframeDoc.getElementById("cherri-proxy-message");
+            handleProxyFailure(detail && detail.textContent);
+            return;
+          }
+        }
+
+        // A real page loaded, so any previous server attempts for this URL are
+        // no longer needed.
+        recoveryAttempts.delete(cTab.url);
+
         const title = iframeDoc.title || new URL(cTab.url).hostname;
 
         const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
@@ -256,12 +347,99 @@ async function go(u) {
     };
   } catch (e) {
     console.error("There was an error while loading the page:", e);
-    showToast(
-      "error",
-      "There was a problem loading the page. Check the console for more info.",
-      "fas fa-times-circle"
-    );
+    setTabError(CherriWisp.describeError(e));
   }
+}
+
+/**
+ * Put a readable failure on the tab instead of leaving a blank frame behind.
+ *
+ * @param {string} message
+ */
+function setTabError(message) {
+  const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+  if (tabEl) {
+    const titleEl = tabEl.querySelector("span");
+    if (titleEl) titleEl.textContent = "Proxy unavailable";
+  }
+
+  if (typeof showToast === "function") {
+    showToast("error", message, "triangle-exclamation");
+  }
+}
+
+/**
+ * The transport was already configured, so a failure here means either the
+ * server died or that particular exit could not complete the destination's TLS
+ * handshake. Try a different Wisp server and automatically retry the same URL.
+ *
+ * @param {string} [message]
+ */
+async function handleProxyFailure(message) {
+  const cTab = bTabs.find((t) => t.id === aTab);
+  const viewframe = document.querySelector(
+    `.viewframe[data-frame-id="${aTab}"]`
+  );
+  const target = cTab && cTab.url;
+  const attempts = target
+    ? recoveryAttempts.get(target) || new Set()
+    : new Set();
+
+  if (wispUrl) attempts.add(wispUrl);
+  if (target) recoveryAttempts.set(target, attempts);
+
+  const isTlsFailure = /error code 35|ssl connect error|tls/i.test(
+    message || ""
+  );
+  const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(
+    message || ""
+  );
+
+  if (isWasmFailure) {
+    setTabError(
+      "The proxy's WebAssembly runtime did not load. Reload the page and try again."
+    );
+    return;
+  }
+
+  setTabError(
+    isTlsFailure
+      ? "That proxy route could not complete the site's secure connection. Trying another route..."
+      : message || "The proxy server stopped responding. Trying another one..."
+  );
+
+  if (!target || !viewframe || attempts.size >= 6) return;
+  if (recoveryPromise) return recoveryPromise;
+
+  console.warn(
+    `[cherri] proxy route ${wispUrl || "unknown"} failed for ${target}; trying another route`
+  );
+
+  recoveryPromise = ensureTransport(true, {
+    exclude: [...attempts],
+  })
+    .then((nextUrl) => {
+      attempts.add(nextUrl);
+      recoveryAttempts.set(target, attempts);
+
+      const currentTab = bTabs.find((tab) => tab.id === aTab);
+      if (currentTab && currentTab.url === target) {
+        // The new transport is ready. Reload only this failed tab, not the
+        // whole cherri page, so other tabs and their sessions stay intact.
+        viewframe.src = encodeForBackend(target);
+      }
+    })
+    .catch((error) => {
+      console.error("[cherri] could not find another proxy route:", error);
+      setTabError(
+        "No working proxy route was found. Try Settings -> Browser -> Wisp Server."
+      );
+    })
+    .finally(() => {
+      recoveryPromise = null;
+    });
+
+  return recoveryPromise;
 }
 
 function b() {
@@ -271,45 +449,36 @@ function b() {
   cTab.historyIndex--;
   const u = cTab.history[cTab.historyIndex];
   cTab.url = u;
-  let furl;
-  const ba = localStorage.getItem("cherri_backend");
-  if (ba.toLowerCase() === "scramjet") {
-    furl = scramjet.encodeUrl(u);
-  } else if (ba.toLowerCase() === "ultraviolet") {
-    furl = __uv$config.prefix + __uv$config.encodeUrl(u);
-  } else {
-    furl = scramjet.encodeUrl(u);
-  }
 
-  go(furl);
+  go(encodeForBackend(u));
 }
 
 function f() {
   const cTab = bTabs.find((t) => t.id === aTab);
+  if (!cTab || cTab.historyIndex + 1 >= cTab.history.length) return;
 
   cTab.historyIndex++;
   const u = cTab.history[cTab.historyIndex];
   cTab.url = u;
-  let furl;
-  const ba = localStorage.getItem("cherri_backend");
-  if (ba.toLowerCase() === "scramjet") {
-    furl = scramjet.encodeUrl(u);
-  } else if (ba.toLowerCase() === "ultraviolet") {
-    furl = __uv$config.prefix + __uv$config.encodeUrl(u);
-  } else {
-    furl = scramjet.encodeUrl(u);
-  }
 
-  go(furl);
+  go(encodeForBackend(u));
 }
 
 function r() {
   const viewframe = document.querySelector(
     `.viewframe[data-frame-id="${aTab}"]`
   );
+  if (!viewframe) return;
   const curl = viewframe.src;
 
-  viewframe.src = curl;
+  // a dead wisp server may have come back up, so do not reuse the cached answer
+  ensureTransport(true)
+    .catch(() => {
+      /* go() reports this; reloading should still be attempted */
+    })
+    .finally(() => {
+      viewframe.src = curl;
+    });
 }
 
 function full() {
@@ -317,7 +486,6 @@ function full() {
     `.viewframe[data-frame-id="${aTab}"]`
   );
   viewframe.requestFullscreen();
-  console.log("sdfkjhasdkjhfg");
 }
 
 function hideBrowser() {

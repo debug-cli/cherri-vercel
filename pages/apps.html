@@ -288,11 +288,14 @@
                     appDiv.classList.add('app');
 
                     appDiv.innerHTML = `
-                    <div class="app-img" style="background: url('${app.img}');" onclick="window.location.href = '/pages/browser.html?launch=${app.url}'"></div>
+                        <div class="app-img" style="background: url('${app.img}');"></div>
                         <div class="title">
-                        <h2 class="h2-title">${app.name}</h2>
-                    </div>
+                            <h2 class="h2-title">${app.name}</h2>
+                        </div>
                     `;
+                    appDiv.querySelector('.app-img').addEventListener('click', () => {
+                        window.location.href = `/pages/browser.html?launch=${encodeURIComponent(app.url)}`;
+                    });
 
                     acont.appendChild(appDiv);
                 });

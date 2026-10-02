@@ -42,7 +42,7 @@
   {
     "name": "Friday Night Funkin",
     "img": "/assets/img/games/gn-math/8.png",
-    "url": "/stores/gn-math/8.html"
+    "url": "/stores/gn-math/8-a.html"
   },
   {
     "name": "Sprunki",
@@ -414,7 +414,7 @@
   {
     "name": "Cookie Clicker",
     "img": "/assets/img/games/gn-math/82.png",
-    "url": "/stores/gn-math/82.html"
+    "url": "/stores/gn-math/82-aa.html"
   },
   {
     "name": "Coreball",
@@ -554,7 +554,7 @@
   {
     "name": "Toss The Turtle",
     "img": "/assets/img/games/gn-math/110.png",
-    "url": "/stores/gn-math/110.html"
+    "url": "/stores/gn-math/110-f.html"
   },
   {
     "name": "Tube Jumpers",
@@ -948,11 +948,6 @@
     "url": "/stores/gn-math/188.html"
   },
   {
-    "name": "Doki Doki Literature Club",
-    "img": "/assets/img/games/gn-math/189.png",
-    "url": "/stores/gn-math/189.html"
-  },
-  {
     "name": "Five Nights at Freddy's: World",
     "img": "/assets/img/games/gn-math/190.png",
     "url": "/stores/gn-math/190.html"
@@ -985,7 +980,7 @@
   {
     "name": "ULTRAKILL",
     "img": "/assets/img/games/gn-math/196.png",
-    "url": "/stores/gn-math/196.html"
+    "url": "/stores/gn-math/196-fixed.html"
   },
   {
     "name": "Elastic Man",
@@ -1020,7 +1015,7 @@
   {
     "name": "DOOM",
     "img": "/assets/img/games/gn-math/203.png",
-    "url": "/stores/gn-math/203.html"
+    "url": "/stores/gn-math/203-a.html"
   },
   {
     "name": "Five Nights at Winston's",
@@ -1090,7 +1085,7 @@
   {
     "name": "Hotline Miami",
     "img": "/assets/img/games/gn-math/217.png",
-    "url": "/stores/gn-math/217.html"
+    "url": "/stores/gn-math/217-c.html"
   },
   {
     "name": "Papa's Bakeria",
@@ -1325,7 +1320,7 @@
   {
     "name": "Speed Stars",
     "img": "/assets/img/games/gn-math/266.png",
-    "url": "/stores/gn-math/266.html"
+    "url": "/stores/gn-math/266-a.html"
   },
   {
     "name": "Pizza Tower",
@@ -1766,7 +1761,7 @@
   {
     "name": "Adventure Capatalist",
     "img": "/assets/img/games/gn-math/354.png",
-    "url": "/stores/gn-math/354.html"
+    "url": "/stores/gn-math/354-a.html"
   },
   {
     "name": "Dadish 2",
@@ -2121,7 +2116,7 @@
   {
     "name": "OMORI",
     "img": "/assets/img/games/gn-math/427.png",
-    "url": "/stores/gn-math/427.html"
+    "url": "/stores/gn-math/427-z.html"
   },
   {
     "name": "Five Nights at Freddy's 4: Halloween",
@@ -2221,7 +2216,7 @@
   {
     "name": "Nijika's Ahoge",
     "img": "/assets/img/games/gn-math/447.png",
-    "url": "/stores/gn-math/447.html"
+    "url": "/stores/gn-math/447-e.html"
   },
   {
     "name": "Aquapark.io",
@@ -2321,7 +2316,7 @@
   {
     "name": "Baldi's Basics Plus",
     "img": "/assets/img/games/gn-math/467.png",
-    "url": "/stores/gn-math/467.html"
+    "url": "/stores/gn-math/467-updatee.html"
   },
   {
     "name": "sandstone",

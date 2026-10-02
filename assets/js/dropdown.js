@@ -3,7 +3,7 @@ const appSettings = {
   backend: localStorage.getItem("cherri_backend") || "Scramjet",
   searchEngine: localStorage.getItem("cherri_searchEngine") || "DuckDuckGo",
   decoy: localStorage.getItem("decoy") || "None",
-  wisp: localStorage.getItem("cherri_wispUrlSelected") || "rhw",
+  wisp: localStorage.getItem("cherri_wispUrlSelected") || "Phantom",
   theme: localStorage.getItem("cherri_theme") || "default",
   store: localStorage.getItem("cherri_gameStore") || "Classplay",
 };
@@ -114,7 +114,7 @@ function closeAllSelectors() {
         "cloak-link-arrow-active",
         "wisp-arrow-active",
         "theme-arrow-active",
-        "store-show"
+        "store-arrow-active"
       )
     );
 }
@@ -148,11 +148,14 @@ const allDecoyOptions = [
 ];
 
 const wispPresets = {
+  Phantom: { url: "wss://phantom.lol/wisp/" },
+  Mercury: { url: "wss://wisp.mercurywork.shop/" },
   rhw: { url: "wss://wisp.rhw.one/" },
-  
 };
 
 const allWispOptions = [
+  "Phantom",
+  "Mercury",
   "rhw",
 ];
 
@@ -325,10 +328,19 @@ document.addEventListener("themeUpdated", (e) => {
   }
 });
 document.addEventListener("wispUpdated", (e) => {
-  const wisp = wispPresets[e.detail];
+  const preset = wispPresets[e.detail];
 
-  localStorage.setItem("cherri_wispUrl", wisp.url);
-  console.log(wisp.url);
+  // normalize, and drop the cached "this server works" answer for the old one
+  const url = CherriWisp.setActiveServer(preset ? preset.url : e.detail, {
+    custom: !preset,
+  });
+
+  if (!url) {
+    console.error("[cherri] not a usable wisp url:", e.detail);
+    return;
+  }
+
+  console.log(url);
 });
 window.addEventListener("load", () => {
   applyDecoy(localStorage.getItem("decoy"));

@@ -6375,6 +6375,13 @@ var LibcurlClient = class {
     if (this.transport)
       libcurl.transport = this.transport;
     libcurl.set_websocket(this.wisp);
+
+    // HTTPSession checks the WASM runtime immediately. Wait for the embedded
+    // libcurl WASM module before constructing it, otherwise every first request
+    // fails with "wasm not loaded yet".
+    if (!libcurl.ready)
+      await libcurl.load_wasm();
+
     this.session = new libcurl.HTTPSession({
       proxy: this.proxy
     });

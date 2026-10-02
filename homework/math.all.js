@@ -3324,7 +3324,18 @@
                 n.path || (n.path = "/"),
                 n.sameSite || (n.sameSite = "lax"),
                 n.expires && (n.expires = n.expires.toString());
-              let s = `${n.domain}@${n.path}@${n.name}`;
+              let s = `${n.domain}@${n.path}@${n.name}`,
+                o = Object.prototype.hasOwnProperty.call(n, "maxAge")
+                  ? Number(n.maxAge)
+                  : NaN;
+              if (Number.isFinite(o)) {
+                if (o <= 0) {
+                  delete this.cookies[s];
+                  continue;
+                }
+                // Max-Age wins over Expires and is relative to receipt time.
+                n.expires = new Date(Date.now() + 1e3 * o).toString();
+              }
               this.cookies[s] = n;
             }
           }
@@ -3347,8 +3358,7 @@
             return i.map((e) => `${e.name}=${e.value}`).join("; ");
           }
           load(e) {
-            if ("object" == typeof e) return e;
-            this.cookies = JSON.parse(e);
+            this.cookies = e && "object" == typeof e ? e : JSON.parse(e || "{}");
           }
           dump() {
             return JSON.stringify(this.cookies);
@@ -4797,7 +4807,8 @@ self.WASM = '${r}';`),
             }
           }
           let v = x["set-cookie"] || [];
-          for (let t in v)
+          Array.isArray(v) || (v = [v]);
+          for (let t of v)
             if (h) {
               let r = f.dispatch(h, {
                 scramjet$type: "cookie",
@@ -4806,7 +4817,7 @@ self.WASM = '${r}';`),
               });
               "document" !== n && "iframe" !== n && (await r);
             }
-          for (let t in (await d.setCookies(v instanceof Array ? v : [v], e),
+          for (let t in (await d.setCookies(v, e),
           x))
             Array.isArray(x[t]) && (x[t] = x[t][0]);
           if (

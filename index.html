@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width">
-    <link rel="icon" type="image/svg+xml" href="/assets/fav.png">
+    <link rel="icon" type="image/svg+xml" href="/assets/img/fav.png">
     <title>cherri</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="/uv/uv.bundle.js"></script>
@@ -14,6 +14,7 @@
     <script src="/assets/js/t.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@widgetbot/html-embed"></script>
     <script src="/homework/math.all.js"></script>
+    <script src="/assets/js/wisp.js"></script>
     <link rel="stylesheet" href="/styles/index.css">
     <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <link rel="stylesheet" href="/fa/css/all.css">
@@ -415,6 +416,8 @@
                         <button class="button"
                             onclick="setWisp(document.querySelector('.wispInput').value)">Set</button>
                     </div>
+                    <p>Status: <b id="wispStatus">Untested</b></p>
+                    <button class="button" onclick="testWispServer()">Test current server</button>
                     <br>
                     <h2>Backend</h2>
                     <p>The main proxy service. Scramjet is newer but more experimental, while Ultraviolet is older but
@@ -608,14 +611,16 @@
         }
     </script>
     <script>
+        // Both game stores ship in this repository, so the Games menu keeps
+        // following whatever the user picked (Classplay by default).
         const selectedStore = localStorage.getItem("cherri_gameStore") ?? "Classplay"
 
-        let res
-        let data
-
         async function gj(file) {
-            res = await fetch(`/assets/json/${file}.json`);
-            data = await res.json()
+            const response = await fetch(`/assets/json/${file}.json`)
+            if (!response.ok) {
+                throw new Error(`Could not load game store ${file} (${response.status})`)
+            }
+            return response.json()
         }
 
         // welcome to my super bad json loader
@@ -623,15 +628,20 @@
         // 0.25 hour(s)
 
         function load(file, type, functionName, toRun, additions) {
-            gj(file).then(() => {
+            // Keep the parsed list local to this request. Apps and Games load in
+            // parallel; sharing a global `data` value made the result depend on
+            // which fetch happened to finish last.
+            gj(file).then(items => {
                 console.log(
                     "%ccherri" + "%c recieved json data!",
                     "color: white; background: linear-gradient(to bottom right, #040c16, #000000); border-radius: 5px; font-weight: bold; padding: 6px; font-family: sans-serif;",
                     "color: white; background: transparent; border-radius: 0px; padding: 0px;"
                 )
-            }).then(() => {
-                data.forEach(item => {
-                    const aCont = document.querySelector(`.${type}-container`)
+
+                const aCont = document.querySelector(`.${type}-container`)
+                if (!aCont) return
+
+                items.forEach(item => {
                     const newAppContainer = document.createElement("div")
 
                     newAppContainer.classList.add("app")
@@ -645,8 +655,13 @@
 
                     aCont.appendChild(newAppContainer)
                 })
-            }).then(() => {
                 observe()
+            }).catch(error => {
+                console.error(`[cherri] ${type} list failed to load:`, error)
+                const aCont = document.querySelector(`.${type}-container`)
+                if (aCont && type === "games") {
+                    aCont.innerHTML = `<p class="game-load-error">Games are temporarily unavailable. Reload to try again.</p>`
+                }
             })
         }
 
@@ -762,7 +777,8 @@
                     document.body.appendChild(contentFrame);
                 }
                 const overlayOn = localStorage.getItem("cherri_useOverlay") ?? "yes"
-                if (overlayOn === "yes" && l.includes("/stores/")) {
+                const isGamePage = l.includes("/stores/") || l.startsWith("play.html?")
+                if (overlayOn === "yes" && isGamePage) {
                     document.querySelector("nav").style.opacity = 0
                     setTimeout(() => {
                         document.querySelector("nav").style.display = "none"
@@ -770,7 +786,7 @@
                 }
                 homeContent.style.display = "none";
                 contentFrame.style.display = "block";
-                contentFrame.src = l.includes("/stores/") ? `/pages/${l}` : `/pages/${l}.html`;
+                contentFrame.src = isGamePage ? `/pages/${l}` : `/pages/${l}.html`;
             }
         }
     </script>
@@ -1255,38 +1271,57 @@
             getActiveUsers()
         }, 30000)
 
+        function setWispStatus(text) {
+            const el = document.getElementById("wispStatus")
+            if (el) el.textContent = text
+        }
+
+        // show whichever server is in use so the box is never empty on open
+        const wispInputEl = document.querySelector(".wispInput")
+        if (wispInputEl && typeof CherriWisp !== "undefined") {
+            wispInputEl.value = localStorage.getItem(CherriWisp.KEYS.custom) || CherriWisp.getConfiguredUrl()
+        }
+
+        function testWispServer() {
+            const url = CherriWisp.getConfiguredUrl()
+
+            CherriWisp.resetCache()
+            setWispStatus("Testing...")
+
+            CherriWisp.probeWispServer(url).then((result) => {
+                setWispStatus(result.ok ? `Online (${result.ms}ms)` : `Unreachable (${result.reason})`)
+            })
+        }
+
         function setWisp(i) {
-            if (!i) return
-
-            console.log("Wisp update started")
-
-            if (i === "") {
+            if (typeof i !== "string" || !i.trim()) {
                 showToast("error", "Wisp cannot be empty!", "fas fa-times-circle")
                 return
             }
-            console.log("Wisp checks passed (1/4)")
 
-            if (!i.endsWith("/")) {
-                showToast("error", "Wisp server must end with a slash!", "fas fa-times-circle")
+            // normalizing, saving and health checking all live in wisp.js, so this
+            // box, the dropdown and the browser agree on one server
+            const url = CherriWisp.setActiveServer(i, { custom: true })
+
+            if (!url) {
+                setWispStatus("Invalid URL")
+                showToast("error", "That is not a valid wisp URL.", "fas fa-times-circle")
                 return
             }
-            console.log("Wisp checks passed (2/4)")
 
-            if (!i.startsWith("wss://") && !i.startsWith("ws://")) {
-                showToast("error", "Wisp server must start with ws(s)://", "fas fa-times-circle")
-                return
-            }
-            console.log("Wisp checks passed (3/4)")
+            if (wispInputEl) wispInputEl.value = url
+            CherriWisp.resetCache()
+            setWispStatus("Testing...")
 
-            if (i.includes(" ")) {
-                showToast("error", "Wisp server must not contain space!", "fas fa-times-circle")
-                return
-            }
-            console.log("Wisp checks passed (4/4)")
-
-            localStorage.setItem("cherri_wispUrl", i)
-            showToast("success", "Wisp server updated! Do<b> ⌘⇧R</b>  to see changes.", "fas fa-check-circle")
-            console.log("Wisp updated", i)
+            CherriWisp.probeWispServer(url).then((result) => {
+                if (result.ok) {
+                    setWispStatus(`Online (${result.ms}ms)`)
+                    showToast("success", `Wisp server is online (${result.ms}ms). Reload to use it.`, "fas fa-check-circle")
+                } else {
+                    setWispStatus(`Unreachable (${result.reason})`)
+                    showToast("error", "That wisp server did not answer. cherri will fall back to the others automatically.", "fas fa-triangle-exclamation")
+                }
+            })
         }
 
     </script>
