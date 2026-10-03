@@ -10,7 +10,7 @@ if (navigator.userAgent.includes("Firefox")) {
 // Scramjet's service worker half. Proxied requests are routed back to the page
 // that owns the frame, and the cookie jar lives with that page too, so nothing
 // proxy related is kept in here.
-importScripts("/homework/chemistry.sw.js");
+importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js");
 
 const CONFIG = {
 	blocked: [
@@ -179,14 +179,11 @@ function blockedTarget(requestUrl) {
  */
 function transportErrorPage(event, error) {
 	const message = (error && error.message) || String(error);
-	const isCertificateFailure =
-		/error code 60|peer certificate|certificate.*(invalid|expired|not ok)|cert.*verify/i.test(
-			message
-		);
-	const isTlsFailure = /error code 35|ssl connect error|tls/i.test(message);
-	const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(
-		message
-	);
+	const classification = CherriProxyErrors.classify(error);
+	const userMessage = escapeHtml(CherriProxyErrors.userMessage(classification));
+	const isPeerVerificationFailure = classification.kind === "peer-verification";
+	const isTlsFailure = classification.kind === "tls-handshake";
+	const isWasmFailure = classification.kind === "runtime";
 	const accept = event.request.headers.get("accept") || "";
 	const isNavigation =
 		event.request.mode === "navigate" || accept.includes("text/html");
@@ -262,24 +259,22 @@ function transportErrorPage(event, error) {
 	<div class="card">
 		<h1>${isWasmFailure
 			? "The proxy runtime failed to start"
-			: isCertificateFailure
-			? "The destination's certificate was rejected"
+			: isPeerVerificationFailure
+			? "The TLS peer could not be verified"
 			: isTlsFailure
 			? "The site's secure connection failed"
 			: "The proxy server could not be reached"}</h1>
 		<p>${isWasmFailure
 			? "The libcurl WebAssembly runtime did not finish loading. Reload the page; this is a proxy startup problem, not a problem with the destination site."
-			: isCertificateFailure
-			? "The destination presented a certificate that failed validation. This is not an unreachable Wisp server, and trying another proxy route will not bypass certificate checks."
 			: isTlsFailure
-			? "The selected proxy route could not finish the destination site's TLS handshake. A different Wisp route may work."
+			? "The selected proxy route could not finish the site's TLS handshake. A different Wisp route may work."
+			: isPeerVerificationFailure
+			? `${userMessage} Try another Wisp route. Cherri retries once on a different route and keeps certificate verification enabled.`
 			: "cherri tunnels every page through a Wisp server, and that server did not answer. It may be offline or blocked on this network."}</p>
 		<p>Requested: <b>${escapeHtml(target)}</b></p>
 		<code id="cherri-proxy-message">${escapeHtml(message)}</code>
 			<p>${isWasmFailure
-				? "Reload the page to retry the proxy runtime, or open Settings &rarr; Proxy &rarr; Wisp."
-				: isCertificateFailure
-				? "Reload only if you want to request the destination again. For other TLS handshake errors, choose a different route under Settings &rarr; Proxy &rarr; Wisp."
+				? "Reload to retry the proxy runtime, or open Settings &rarr; Proxy &rarr; Wisp."
 				: "Reload to try another route, or pick a different server under Settings &rarr; Proxy &rarr; Wisp."}
 			Current server: <b id="server">unknown</b></p>
 		<div class="row">

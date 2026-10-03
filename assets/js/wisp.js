@@ -590,6 +590,32 @@
   function describeError(error) {
     const message = (error && (error.message || String(error))) || "Unknown proxy error";
 
+    if (/no bare clients|no BareTransport was set/i.test(message)) {
+      return "The proxy transport never started. Reload the page to try again.";
+    }
+
+    if (error && error.code === "NO_WISP_SERVER") {
+      return (
+        "None of the proxy servers on the list could be reached. Open Settings -> " +
+        "Browser and set a wisp server that works on your network."
+      );
+    }
+
+    if (global.CherriProxyErrors) {
+      const classification = global.CherriProxyErrors.classify(error);
+      if (classification.kind === "connectivity") {
+        return (
+          "cherri could not reach its proxy server (" +
+          getConfiguredUrl() +
+          "). The server is either down or blocked on this network. cherri will keep " +
+          "trying the other servers on the list."
+        );
+      }
+      if (classification.kind !== "other") {
+        return global.CherriProxyErrors.userMessage(classification);
+      }
+    }
+
     if (/wasm not loaded|load_wasm|failed to load wasm/i.test(message)) {
       return "The proxy's libcurl WebAssembly runtime did not load. Reload the page and try again.";
     }
@@ -600,17 +626,6 @@
         getConfiguredUrl() +
         "). The server is either down or blocked on this network. cherri will keep " +
         "trying the other servers on the list."
-      );
-    }
-
-    if (/no bare clients|no BareTransport was set/i.test(message)) {
-      return "The proxy transport never started. Reload the page to try again.";
-    }
-
-    if (error && error.code === "NO_WISP_SERVER") {
-      return (
-        "None of the proxy servers on the list could be reached. Open Settings -> " +
-        "Browser and set a wisp server that works on your network."
       );
     }
 

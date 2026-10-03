@@ -336,9 +336,9 @@ function nav(i) {
   go(url);
 }
 
-function updateUrlFromIframe(viewframe) {
+function updateUrlFromIframe(viewframe, tabId = aTab) {
   try {
-    const cTab = bTabs.find((t) => t.id === aTab);
+    const cTab = bTabs.find((t) => t.id === tabId);
     if (!cTab) return;
 
     let decodedUrl;
@@ -350,7 +350,7 @@ function updateUrlFromIframe(viewframe) {
       }
     } else {
       // every Scramjet frame has its own prefix, so strip it and decode the rest
-      const frame = scramjetFrames.get(cTab.id);
+      const frame = scramjetFrames.get(tabId);
 
       if (frame && currentSrc.startsWith(frame.prefix)) {
         try {
@@ -367,9 +367,9 @@ function updateUrlFromIframe(viewframe) {
       cTab.url = decodedUrl;
 
       const ubar = document.getElementById("searchbar");
-      if (ubar) ubar.value = decodedUrl;
+      if (ubar && tabId === aTab) ubar.value = decodedUrl;
 
-      const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`);
+      const favEl = document.querySelector(`#fav[data-fav-id="${tabId}"]`);
       if (favEl) {
         const faviconDomain = new URL(decodedUrl).hostname;
         favEl.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(faviconDomain)}&sz=32`;
@@ -380,23 +380,23 @@ function updateUrlFromIframe(viewframe) {
   }
 }
 
-async function go(target) {
-  const cTab = bTabs.find((t) => t.id === aTab);
-  const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`);
+async function go(target, tabId = aTab) {
+  const cTab = bTabs.find((t) => t.id === tabId);
+  const favEl = document.querySelector(`#fav[data-fav-id="${tabId}"]`);
   const viewframe = document.querySelector(
-    `.viewframe[data-frame-id="${aTab}"]`
+    `.viewframe[data-frame-id="${tabId}"]`
   );
   if (!viewframe) return;
 
   const ubar = document.getElementById("searchbar");
 
-  const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+  const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
   if (tabEl) {
     const titleEl = tabEl.querySelector("span");
     if (titleEl) titleEl.textContent = "Loading...";
   }
 
-  if (ubar) ubar.value = cTab.url;
+  if (ubar && tabId === aTab) ubar.value = cTab.url;
   if (favEl) {
     const faviconDomain = new URL(cTab.url).hostname;
     favEl.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(faviconDomain)}&sz=32`;
@@ -413,7 +413,7 @@ async function go(target) {
     ]);
   } catch (error) {
     console.error("[cherri] proxy transport unavailable:", error);
-    setTabError(CherriWisp.describeError(error));
+    setTabError(CherriWisp.describeError(error), tabId);
     return;
   }
 
@@ -429,33 +429,33 @@ async function go(target) {
           const marker = iframeDoc.documentElement.dataset;
           if (marker && marker.cherriProxyError) {
             const detail = iframeDoc.getElementById("cherri-proxy-message");
-            handleProxyFailure(detail && detail.textContent);
+            handleProxyFailure(detail && detail.textContent, tabId);
             return;
           }
         }
 
         // A real page loaded, so any previous server attempts for this URL are
         // no longer needed.
-        recoveryAttempts.delete(cTab.url);
+        recoveryAttempts.delete(tabId);
 
         const title = iframeDoc.title || new URL(cTab.url).hostname;
 
-        const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+        const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
         if (tabEl) {
           const titleEl = tabEl.querySelector("span");
           if (titleEl) titleEl.textContent = title;
         }
 
-        updateUrlFromIframe(viewframe);
+        updateUrlFromIframe(viewframe, tabId);
       } catch (e) {
         console.error("Error accessing iframe content:", e);
-        const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+        const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
         if (tabEl) {
           const titleEl = tabEl.querySelector("span");
           if (titleEl) titleEl.textContent = new URL(cTab.url).hostname;
         }
 
-        updateUrlFromIframe(viewframe);
+        updateUrlFromIframe(viewframe, tabId);
       }
     };
 
@@ -469,11 +469,11 @@ async function go(target) {
 
       viewframe.src = __uv$config.prefix + __uv$config.encodeUrl(target);
     } else {
-      (await scramjetFrameFor(aTab, viewframe)).go(target);
+      (await scramjetFrameFor(tabId, viewframe)).go(target);
     }
   } catch (e) {
     console.error("There was an error while loading the page:", e);
-    setTabError(CherriWisp.describeError(e));
+    setTabError(CherriWisp.describeError(e), tabId);
   }
 }
 
@@ -482,8 +482,8 @@ async function go(target) {
  *
  * @param {string} message
  */
-function setTabError(message) {
-  const tabEl = document.querySelector(`.tab[data-tab-id="${aTab}"]`);
+function setTabError(message, tabId = aTab) {
+  const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
   if (tabEl) {
     const titleEl = tabEl.querySelector("span");
     if (titleEl) titleEl.textContent = "Proxy unavailable";
@@ -495,67 +495,102 @@ function setTabError(message) {
 }
 
 /**
- * A retryable route failure may indicate a dead Wisp server or an exit-specific
- * TLS handshake issue. Certificate validation errors are not retried because
- * switching routes cannot make an invalid destination certificate trustworthy.
+ * Route retries can recover from unavailable endpoints and destination-specific
+ * TLS failures on a particular Wisp exit. Certificate verification stays enabled;
+ * curl 60 receives only one alternate-route attempt.
  *
  * @param {string} [message]
  */
-async function handleProxyFailure(message) {
-  const cTab = bTabs.find((t) => t.id === aTab);
+async function handleProxyFailure(message, tabId = aTab) {
+  const cTab = bTabs.find((t) => t.id === tabId);
   const viewframe = document.querySelector(
-    `.viewframe[data-frame-id="${aTab}"]`
+    `.viewframe[data-frame-id="${tabId}"]`
   );
   const target = cTab && cTab.url;
-  const attempts = target
-    ? recoveryAttempts.get(target) || new Set()
-    : new Set();
+  const previousRecovery = recoveryAttempts.get(tabId);
+  const attempts =
+    target && previousRecovery && previousRecovery.target === target
+      ? previousRecovery.attempts
+      : new Set();
 
   const errorMessage = message || "";
-  const isCertificateFailure =
-    /error code 60|peer certificate|certificate.*(invalid|expired|not ok)|cert.*verify/i.test(
-      errorMessage
-    );
-  const isTlsFailure = /error code 35|ssl connect error|tls/i.test(errorMessage);
-  const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(errorMessage);
+  const classification = globalThis.CherriProxyErrors
+    ? globalThis.CherriProxyErrors.classify(errorMessage)
+    : { kind: "other", message: errorMessage };
+  const isPeerVerificationFailure = classification.kind === "peer-verification";
+  const isRuntimeFailure = classification.kind === "runtime";
+  const isTlsFailure = classification.kind === "tls-handshake";
+  const isConnectivityFailure = classification.kind === "connectivity";
+  const isRetryableRouteFailure = globalThis.CherriProxyErrors
+    ? globalThis.CherriProxyErrors.shouldRetryRoute(classification)
+    : isTlsFailure || isConnectivityFailure;
 
-  if (isWasmFailure) {
+  if (isPeerVerificationFailure || isRuntimeFailure) {
+    const detail = globalThis.CherriProxyErrors
+      ? globalThis.CherriProxyErrors.userMessage(classification)
+      : CherriWisp.describeError(errorMessage);
+    if (!isPeerVerificationFailure) {
+      setTabError(detail, tabId);
+      return;
+    }
+
+    if (wispUrl) attempts.add(wispUrl);
+    if (target) recoveryAttempts.set(tabId, { target, attempts });
+    const maxAttempts = globalThis.CherriProxyErrors
+      ? globalThis.CherriProxyErrors.maxRouteAttempts(classification)
+      : 2;
+    const canRetry = Boolean(wispUrl) && attempts.size < maxAttempts;
     setTabError(
-      "The proxy's WebAssembly runtime did not load. Reload the page and try again."
+      canRetry
+        ? `${detail} Trying one alternate Wisp route; certificate checks remain enabled.`
+        : `${detail} No further route retries will be attempted automatically.`,
+      tabId
     );
-    return;
+    if (!canRetry) return;
+    return retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId);
   }
 
-  if (isCertificateFailure) {
-    setTabError(
-      "The destination rejected its TLS certificate (curl 60). This is a certificate validation failure, not an unreachable Wisp server; no alternate routes will be tried."
-    );
-    return;
-  }
-
-  const isRetryableRouteFailure =
-    isTlsFailure || /error code 7|could not connect to server/i.test(errorMessage);
   if (wispUrl) attempts.add(wispUrl);
-  if (target) recoveryAttempts.set(target, attempts);
+  if (target) recoveryAttempts.set(tabId, { target, attempts });
 
   setTabError(
     isTlsFailure
       ? "That proxy route could not complete the site's secure connection. Trying another route..."
       : isRetryableRouteFailure
         ? "The proxy route stopped responding. Trying another one..."
-        : message || "The proxy request failed. Check the error above before retrying."
+        : message || "The proxy request failed. Check the error above before retrying.",
+    tabId
   );
 
-  if (
-    !isRetryableRouteFailure ||
-    !target ||
-    !viewframe ||
-    attempts.size >= 6
-  ) return;
-  if (recoveryPromise) return recoveryPromise;
+  if (!isRetryableRouteFailure || !target || !viewframe) return;
 
+  const maxAttempts = globalThis.CherriProxyErrors
+    ? globalThis.CherriProxyErrors.maxRouteAttempts(classification)
+    : 6;
+  return retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId);
+}
+
+async function retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId) {
+  if (!target || !viewframe || attempts.size >= maxAttempts) return;
+  if (recoveryPromise) {
+    return recoveryPromise.then((nextUrl) => {
+      if (!nextUrl || attempts.has(nextUrl) || attempts.size >= maxAttempts) return;
+      attempts.add(nextUrl);
+      recoveryAttempts.set(tabId, { target, attempts });
+
+      const currentTab = bTabs.find((tab) => tab.id === tabId);
+      if (currentTab && currentTab.url === target) go(target, tabId);
+    });
+  }
+
+  let targetHost = "unknown";
+  try {
+    targetHost = new URL(target).hostname;
+  } catch (error) {
+    /* Never log a full URL; malformed input has no safe hostname to report. */
+  }
   console.warn(
-    `[cherri] proxy route ${wispUrl || "unknown"} failed for ${target}; trying another route`
+    `[cherri] proxy route ${wispUrl || "unknown"} failed for ${targetHost}; trying another route`
   );
 
   recoveryPromise = ensureTransport(true, {
@@ -563,20 +598,23 @@ async function handleProxyFailure(message) {
   })
     .then((nextUrl) => {
       attempts.add(nextUrl);
-      recoveryAttempts.set(target, attempts);
+      recoveryAttempts.set(tabId, { target, attempts });
 
-      const currentTab = bTabs.find((tab) => tab.id === aTab);
+      const currentTab = bTabs.find((tab) => tab.id === tabId);
       if (currentTab && currentTab.url === target) {
         // The new transport is ready. Reload only this failed tab, not the
         // whole cherri page, so other tabs and their sessions stay intact.
-        go(target);
+        go(target, tabId);
       }
+      return nextUrl;
     })
     .catch((error) => {
       console.error("[cherri] could not find another proxy route:", error);
       setTabError(
-        "No working proxy route was found. Try Settings -> Proxy -> Wisp."
+        "No working proxy route was found. Try Settings -> Proxy -> Wisp.",
+        tabId
       );
+      return null;
     })
     .finally(() => {
       recoveryPromise = null;
