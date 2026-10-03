@@ -409,13 +409,19 @@
 
                 <div id="settings-proxy" class="settings-page">
                     <h2>Wisp</h2>
-                    <p>Websocket all content will be transferred through. Make sure the one in use is not blocked, or
-                        else it will not function! <b>The server you use must start with ws(s):// and end with a /.</b>
-                    </p>
-                    <div class="hcontainer">
-                        <input class="wispInput" type="text" placeholder="wss://domain.tld/wisp/">
-                        <button class="button"
-                            onclick="setWisp(document.querySelector('.wispInput').value)">Set</button>
+                    <p>Choose a Wisp route. Public endpoints are community-operated and unofficial; availability and privacy are not guaranteed. The test checks only the Wisp handshake, not uptime or destination compatibility.</p>
+                    <p>When a selected route cannot connect, Cherri tries another route and marks it as an automatic fallback. Reload after changing the route to reconnect.</p>
+                    <p><b>Current server:</b> <span id="wispCurrentServer">Loading…</span></p>
+                    <div class="wisp-selector">
+                        <div class="wisp-selected" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false"></div>
+                        <div class="wisp-options" role="listbox"></div>
+                    </div>
+                    <div class="wisp-custom-settings" style="display: none">
+                        <p>Custom server URL (must start with ws:// or wss://):</p>
+                        <div class="hcontainer">
+                            <input class="wispInput" type="text" placeholder="wss://domain.tld/wisp/">
+                            <button class="button" onclick="setWisp(document.querySelector('.wispInput').value)">Set</button>
+                        </div>
                     </div>
                     <p>Status: <b id="wispStatus">Untested</b></p>
                     <button class="button" onclick="testWispServer()">Test current server</button>
@@ -431,7 +437,7 @@
                     </div>
 
                     <h2>Search Engine</h2>
-                    <p>This is the search engine that the proxy will use with search queries.</p>
+                    <p>This is the search engine that the proxy will use with search queries. Google is the default for new settings; a saved preference remains selected.</p>
                     <div class="search-engine-selector">
                         <div class="search-engine-selected"></div>
                         <div class="search-engine-options">
@@ -992,7 +998,16 @@
 
             let url = input;
             if (!url.includes(".") || url.includes(" ")) {
-                url = url;
+                const searchEngine = localStorage.getItem("cherri_searchEngine") || "Google";
+                const searchUrls = {
+                    Google: "https://google.com/search?q=",
+                    DuckDuckGo: "https://duckduckgo.com/search?q=",
+                    Bing: "https://bing.com/search?q=",
+                    Startpage: "https://startpage.com/search?q=",
+                    Qwant: "https://qwant.com/search?q=",
+                    Brave: "https://search.brave.com/search?q=",
+                };
+                url = (searchUrls[searchEngine] || searchUrls.Google) + encodeURIComponent(url);
             } else {
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     url = "https://" + url;
@@ -1277,11 +1292,23 @@
             if (el) el.textContent = text
         }
 
-        // show whichever server is in use so the box is never empty on open
+        function setCurrentWispServer(url) {
+            const el = document.getElementById("wispCurrentServer")
+            if (el) el.textContent = url || "Unknown"
+        }
+
+        // Keep the last custom URL ready when the user switches back to custom mode.
         const wispInputEl = document.querySelector(".wispInput")
         if (wispInputEl && typeof CherriWisp !== "undefined") {
-            wispInputEl.value = localStorage.getItem(CherriWisp.KEYS.custom) || CherriWisp.getConfiguredUrl()
+            wispInputEl.value = localStorage.getItem(CherriWisp.KEYS.custom) || ""
         }
+        if (typeof CherriWisp !== "undefined") {
+            setCurrentWispServer(CherriWisp.getConfiguredUrl())
+        }
+        document.addEventListener("cherriWispServerChanged", (event) => {
+            setCurrentWispServer(event.detail)
+            if (typeof updateWispSelector === "function") updateWispSelector()
+        })
 
         function testWispServer() {
             const url = CherriWisp.getConfiguredUrl()
@@ -1311,6 +1338,8 @@
             }
 
             if (wispInputEl) wispInputEl.value = url
+            setCurrentWispServer(url)
+            if (typeof updateWispSelector === "function") updateWispSelector()
             CherriWisp.resetCache()
             setWispStatus("Testing...")
 

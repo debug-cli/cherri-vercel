@@ -424,10 +424,13 @@
     if (!normalized) return null;
 
     write(KEYS.active, normalized);
-    if (options && options.custom) write(KEYS.custom, normalized);
+    if (options && options.custom) {
+      write(KEYS.custom, normalized);
+      write(KEYS.preset, "Custom");
+    }
 
     const preset = presetForUrl(normalized);
-    if (preset) write(KEYS.preset, preset.id);
+    if (preset && !(options && options.custom)) write(KEYS.preset, preset.id);
 
     // a hand picked server has not been proven yet
     state.verified = null;
@@ -461,22 +464,67 @@
     }
 
     state.inflight = (async () => {
-      const candidates = candidateList({ exclude: [...excluded] });
-      if (!candidates.length) return null;
+      const preferred = normalizeWispUrl(getConfiguredUrl());
+      let result = null;
 
-      const result = await probePool(candidates, {
-        concurrency: opts.concurrency,
-        timeoutMs: opts.timeoutMs,
-        maxWaitMs: opts.maxWaitMs,
-        onStatus: opts.onStatus,
-      });
+      // Respect the endpoint chosen in Settings first. Fall back quickly if it
+      // does not answer, rather than racing every community route and silently
+      // replacing the user's selection with whichever handshake wins first.
+      if (preferred && !excluded.has(preferred)) {
+        if (opts.onStatus) opts.onStatus({ phase: "testing", url: preferred });
+        result = await probeWispServer(preferred, {
+          timeoutMs: opts.preferredTimeoutMs || 1500,
+        });
+        if (!result.ok) {
+          if (opts.onStatus) opts.onStatus({ phase: "failed", result });
+          result = null;
+        }
+      }
+
+      if (!result) {
+        const candidates = candidateList({
+          exclude: [...excluded, ...(preferred ? [preferred] : [])],
+        });
+        if (!candidates.length) return null;
+
+        result = await probePool(candidates, {
+          concurrency: opts.concurrency,
+          timeoutMs: opts.timeoutMs,
+          maxWaitMs: opts.maxWaitMs,
+          onStatus: opts.onStatus,
+        });
+      }
 
       if (result) {
+        const previousActive = normalizeWispUrl(read(KEYS.active));
+        const previousSelection = read(KEYS.preset);
         write(KEYS.active, result.url);
         write(KEYS.verifiedAt, String(Date.now()));
         const preset = presetForUrl(result.url);
-        if (preset) write(KEYS.preset, preset.id);
+        const selectionChanged =
+          previousActive !== result.url ||
+          (result.url === preferred && preset && previousSelection !== preset.id) ||
+          (result.url !== preferred && previousSelection !== "Fallback");
+        if (
+          result.url === preferred &&
+          preset &&
+          previousSelection !== "Custom" &&
+          previousSelection !== "Fallback"
+        ) {
+          write(KEYS.preset, preset.id);
+        } else if (result.url !== preferred) {
+          write(KEYS.preset, "Fallback");
+        }
         state.verified = result;
+        if (selectionChanged && typeof global.dispatchEvent === "function") {
+          try {
+            global.dispatchEvent(
+              new CustomEvent("cherriWispServerChanged", { detail: result.url })
+            );
+          } catch (error) {
+            /* non-browser test environments may not provide CustomEvent */
+          }
+        }
       } else {
         state.verified = null;
       }

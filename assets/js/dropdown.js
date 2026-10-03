@@ -1,7 +1,12 @@
 // thanks to https://waves.lat for custom dropdowns || https://gitlab.com/waveslab/waves
+const SEARCH_ENGINE_DEFAULT_MIGRATION = "cherri_searchEngineGoogleDefaultV1";
+if (!localStorage.getItem(SEARCH_ENGINE_DEFAULT_MIGRATION)) {
+  localStorage.setItem(SEARCH_ENGINE_DEFAULT_MIGRATION, "1");
+}
+
 const appSettings = {
   backend: localStorage.getItem("cherri_backend") || "Scramjet",
-  searchEngine: localStorage.getItem("cherri_searchEngine") || "DuckDuckGo",
+  searchEngine: localStorage.getItem("cherri_searchEngine") || "Google",
   decoy: localStorage.getItem("decoy") || "None",
   wisp: localStorage.getItem("cherri_wispUrlSelected") || "Phantom",
   theme: localStorage.getItem("cherri_theme") || "default",
@@ -117,11 +122,11 @@ function closeAllSelectors() {
         "store-arrow-active"
       )
     );
+  document.querySelectorAll(".wisp-selected[aria-expanded='true']").forEach((el) => {
+    el.setAttribute("aria-expanded", "false");
+  });
 }
 
-const defaultWispUrl = `${
-  window.location.protocol === "https:" ? "wss" : "ws"
-}://${window.location.host}/w/`;
 const allBackendOptions = ["Ultraviolet", "Scramjet"];
 const allTransportOptions = ["Epoxy", "Libcurl"];
 const allSearchEngineOptions = [
@@ -147,17 +152,131 @@ const allDecoyOptions = [
   "Billibilli",
 ];
 
-const wispPresets = {
-  Phantom: { url: "wss://phantom.lol/wisp/" },
-  Mercury: { url: "wss://wisp.mercurywork.shop/" },
-  rhw: { url: "wss://wisp.rhw.one/" },
-};
+const wispPresets = CherriWisp.PRESETS;
+const wispSelectablePresets = wispPresets.filter((preset) =>
+  ["Phantom", "Mercury", "Definitely Science 1", "Anura 1", "Terbium 1"].includes(
+    preset.id
+  )
+);
+const customWispOption = "Custom server…";
+const wispSelector = document.querySelector(".wisp-selector");
+const wispSelected = wispSelector.querySelector(".wisp-selected");
+const wispOptions = wispSelector.querySelector(".wisp-options");
+const wispCustomSettings = document.querySelector(".wisp-custom-settings");
+const wispInput = document.querySelector(".wispInput");
 
-const allWispOptions = [
-  "Phantom",
-  "Mercury",
-  "rhw",
-];
+function selectedWispPreset() {
+  const selectedId = localStorage.getItem(CherriWisp.KEYS.preset);
+  if (selectedId === "Fallback" || selectedId === "Custom") return null;
+
+  const configured = CherriWisp.normalizeWispUrl(CherriWisp.getConfiguredUrl());
+  const configuredPreset = wispPresets.find((preset) => preset.url === configured);
+  if (configuredPreset && configuredPreset.id !== selectedId) return configuredPreset;
+  return wispPresets.find((preset) => preset.id === selectedId) || configuredPreset || null;
+}
+
+function availableWispPresets() {
+  const selected = selectedWispPreset();
+  if (
+    selected &&
+    !wispSelectablePresets.some((preset) => preset.id === selected.id)
+  ) {
+    return [selected, ...wispSelectablePresets];
+  }
+  return wispSelectablePresets;
+}
+
+function updateWispSelector() {
+  const preset = selectedWispPreset();
+  const activeUrl = CherriWisp.normalizeWispUrl(CherriWisp.getConfiguredUrl());
+  const customUrl = CherriWisp.normalizeWispUrl(
+    localStorage.getItem(CherriWisp.KEYS.custom)
+  );
+  const selection = localStorage.getItem(CherriWisp.KEYS.preset);
+  const isFallback = selection === "Fallback";
+  const isCustom = selection === "Custom" && activeUrl === customUrl;
+  const label = preset
+    ? preset.name
+    : isCustom
+      ? customWispOption
+      : isFallback
+        ? "Automatic fallback"
+        : wispPresets[0].name;
+
+  wispSelected.textContent = label;
+  wispSelected.setAttribute("aria-expanded", "false");
+  wispCustomSettings.style.display = label === customWispOption ? "block" : "none";
+  if (wispInput) {
+    wispInput.value = localStorage.getItem(CherriWisp.KEYS.custom) || "";
+  }
+  if (typeof setCurrentWispServer === "function") {
+    setCurrentWispServer(activeUrl);
+  }
+}
+
+function selectWisp(option) {
+  if (option === customWispOption) {
+    const customUrl = localStorage.getItem(CherriWisp.KEYS.custom);
+    wispSelected.textContent = customWispOption;
+    wispCustomSettings.style.display = "block";
+    if (wispInput) wispInput.value = customUrl || "";
+    if (customUrl) {
+      const url = CherriWisp.setActiveServer(customUrl, { custom: true });
+      if (url) {
+        CherriWisp.resetCache();
+        updateWispSelector();
+        setWispStatus("Selected; reload Cherri to use this route");
+      }
+    } else {
+      setWispStatus("Enter a custom server URL, then select Set");
+    }
+    return;
+  }
+
+  const preset = wispSelectablePresets.find((entry) => entry.name === option);
+  if (!preset) return;
+
+  const url = CherriWisp.setActiveServer(preset.url);
+  if (!url) return;
+  localStorage.setItem(CherriWisp.KEYS.preset, preset.id);
+  CherriWisp.resetCache();
+  updateWispSelector();
+  setWispStatus("Selected; reload Cherri to use this route");
+}
+
+wispSelected.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const wasOpen = wispOptions.classList.contains("wisp-show");
+  closeAllSelectors();
+  if (wasOpen) return;
+
+  wispOptions.innerHTML = "";
+  [...availableWispPresets().map((preset) => preset.name), customWispOption]
+    .filter((name) => name !== wispSelected.textContent)
+    .forEach((name) => {
+      const option = document.createElement("div");
+      option.textContent = name;
+      option.setAttribute("role", "option");
+      option.addEventListener("click", (clickEvent) => {
+        clickEvent.stopPropagation();
+        closeAllSelectors();
+        selectWisp(name);
+      });
+      wispOptions.appendChild(option);
+    });
+  wispOptions.classList.add("wisp-show");
+  wispSelected.classList.add("wisp-arrow-active");
+  wispSelected.setAttribute("aria-expanded", "true");
+});
+
+wispSelected.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    wispSelected.click();
+  }
+});
+
+updateWispSelector();
 
 const allThemeOptions = [
   "default",
@@ -328,20 +447,9 @@ document.addEventListener("themeUpdated", (e) => {
   }
 });
 document.addEventListener("wispUpdated", (e) => {
-  const preset = wispPresets[e.detail];
-
-  // normalize, and drop the cached "this server works" answer for the old one
-  const url = CherriWisp.setActiveServer(preset ? preset.url : e.detail, {
-    custom: !preset,
-  });
-
-  if (!url) {
-    console.error("[cherri] not a usable wisp url:", e.detail);
-    return;
-  }
-
-  console.log(url);
+  selectWisp(e.detail);
 });
+document.addEventListener("cherriWispServerChanged", updateWispSelector);
 window.addEventListener("load", () => {
   applyDecoy(localStorage.getItem("decoy"));
   console.log("Cloaked as " + localStorage.getItem("decoy"));

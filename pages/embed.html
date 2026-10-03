@@ -299,7 +299,7 @@
             let url = (input || "").trim();
             if (!url) return;
             if (!url.includes(".") || url.includes(" ")) {
-                url = "https://search.brave.com/search?q=" + url;
+                url = searchE + encodeURIComponent(url);
             } else {
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     url = "https://" + url;

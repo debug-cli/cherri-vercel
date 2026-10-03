@@ -4,8 +4,16 @@ let bTabs = [];
 // bare-mux is only used by the Ultraviolet backend now
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 
+const SEARCH_ENGINE_DEFAULT_MIGRATION = "cherri_searchEngineGoogleDefaultV1";
+if (!localStorage.getItem(SEARCH_ENGINE_DEFAULT_MIGRATION)) {
+  if (localStorage.getItem("cherri_searchEngine") === "DuckDuckGo") {
+    localStorage.setItem("cherri_searchEngine", "Google");
+  }
+  localStorage.setItem(SEARCH_ENGINE_DEFAULT_MIGRATION, "1");
+}
+
 let searchE;
-const se = localStorage.getItem("cherri_searchEngine") || "DuckDuckGo";
+const se = localStorage.getItem("cherri_searchEngine") || "Google";
 
 if (se === "DuckDuckGo") {
   searchE = "https://duckduckgo.com/search?q=";
@@ -362,8 +370,10 @@ function updateUrlFromIframe(viewframe) {
       if (ubar) ubar.value = decodedUrl;
 
       const favEl = document.querySelector(`#fav[data-fav-id="${aTab}"]`);
-      if (favEl)
-        favEl.src = `https://www.google.com/s2/favicons?domain=${decodedUrl}&sz=256`;
+      if (favEl) {
+        const faviconDomain = new URL(decodedUrl).hostname;
+        favEl.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(faviconDomain)}&sz=32`;
+      }
     }
   } catch (e) {
     console.error("Error updating URL from iframe:", e);
@@ -387,9 +397,10 @@ async function go(target) {
   }
 
   if (ubar) ubar.value = cTab.url;
-  const favUrl = cTab.url;
-  if (favEl)
-    favEl.src = `https://www.google.com/s2/favicons?domain=${favUrl}&sz=256`;
+  if (favEl) {
+    const faviconDomain = new URL(cTab.url).hostname;
+    favEl.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(faviconDomain)}&sz=32`;
+  }
 
   try {
     // Wait for every side of the proxy to be ready: the service worker that
@@ -484,9 +495,9 @@ function setTabError(message) {
 }
 
 /**
- * The transport was already configured, so a failure here means either the
- * server died or that particular exit could not complete the destination's TLS
- * handshake. Try a different Wisp server and automatically retry the same URL.
+ * A retryable route failure may indicate a dead Wisp server or an exit-specific
+ * TLS handshake issue. Certificate validation errors are not retried because
+ * switching routes cannot make an invalid destination certificate trustworthy.
  *
  * @param {string} [message]
  */
@@ -500,15 +511,13 @@ async function handleProxyFailure(message) {
     ? recoveryAttempts.get(target) || new Set()
     : new Set();
 
-  if (wispUrl) attempts.add(wispUrl);
-  if (target) recoveryAttempts.set(target, attempts);
-
-  const isTlsFailure = /error code 35|ssl connect error|tls/i.test(
-    message || ""
-  );
-  const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(
-    message || ""
-  );
+  const errorMessage = message || "";
+  const isCertificateFailure =
+    /error code 60|peer certificate|certificate.*(invalid|expired|not ok)|cert.*verify/i.test(
+      errorMessage
+    );
+  const isTlsFailure = /error code 35|ssl connect error|tls/i.test(errorMessage);
+  const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(errorMessage);
 
   if (isWasmFailure) {
     setTabError(
@@ -517,13 +526,32 @@ async function handleProxyFailure(message) {
     return;
   }
 
+  if (isCertificateFailure) {
+    setTabError(
+      "The destination rejected its TLS certificate (curl 60). This is a certificate validation failure, not an unreachable Wisp server; no alternate routes will be tried."
+    );
+    return;
+  }
+
+  const isRetryableRouteFailure =
+    isTlsFailure || /error code 7|could not connect to server/i.test(errorMessage);
+  if (wispUrl) attempts.add(wispUrl);
+  if (target) recoveryAttempts.set(target, attempts);
+
   setTabError(
     isTlsFailure
       ? "That proxy route could not complete the site's secure connection. Trying another route..."
-      : message || "The proxy server stopped responding. Trying another one..."
+      : isRetryableRouteFailure
+        ? "The proxy route stopped responding. Trying another one..."
+        : message || "The proxy request failed. Check the error above before retrying."
   );
 
-  if (!target || !viewframe || attempts.size >= 6) return;
+  if (
+    !isRetryableRouteFailure ||
+    !target ||
+    !viewframe ||
+    attempts.size >= 6
+  ) return;
   if (recoveryPromise) return recoveryPromise;
 
   console.warn(
@@ -547,7 +575,7 @@ async function handleProxyFailure(message) {
     .catch((error) => {
       console.error("[cherri] could not find another proxy route:", error);
       setTabError(
-        "No working proxy route was found. Try Settings -> Browser -> Wisp Server."
+        "No working proxy route was found. Try Settings -> Proxy -> Wisp."
       );
     })
     .finally(() => {

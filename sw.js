@@ -179,6 +179,10 @@ function blockedTarget(requestUrl) {
  */
 function transportErrorPage(event, error) {
 	const message = (error && error.message) || String(error);
+	const isCertificateFailure =
+		/error code 60|peer certificate|certificate.*(invalid|expired|not ok)|cert.*verify/i.test(
+			message
+		);
 	const isTlsFailure = /error code 35|ssl connect error|tls/i.test(message);
 	const isWasmFailure = /wasm not loaded|load_wasm|failed to load wasm/i.test(
 		message
@@ -258,23 +262,29 @@ function transportErrorPage(event, error) {
 	<div class="card">
 		<h1>${isWasmFailure
 			? "The proxy runtime failed to start"
+			: isCertificateFailure
+			? "The destination's certificate was rejected"
 			: isTlsFailure
 			? "The site's secure connection failed"
 			: "The proxy server could not be reached"}</h1>
 		<p>${isWasmFailure
 			? "The libcurl WebAssembly runtime did not finish loading. Reload the page; this is a proxy startup problem, not a problem with the destination site."
+			: isCertificateFailure
+			? "The destination presented a certificate that failed validation. This is not an unreachable Wisp server, and trying another proxy route will not bypass certificate checks."
 			: isTlsFailure
 			? "The selected proxy route could not finish the destination site's TLS handshake. A different Wisp route may work."
 			: "cherri tunnels every page through a Wisp server, and that server did not answer. It may be offline or blocked on this network."}</p>
 		<p>Requested: <b>${escapeHtml(target)}</b></p>
 		<code id="cherri-proxy-message">${escapeHtml(message)}</code>
 			<p>${isWasmFailure
-				? "Reload the page to retry the proxy runtime, or open Settings &rarr; Browser &rarr; Wisp Server."
-				: "Reload to try another route, or pick a different server under Settings &rarr; Browser &rarr; Wisp Server."}
+				? "Reload the page to retry the proxy runtime, or open Settings &rarr; Proxy &rarr; Wisp."
+				: isCertificateFailure
+				? "Reload only if you want to request the destination again. For other TLS handshake errors, choose a different route under Settings &rarr; Proxy &rarr; Wisp."
+				: "Reload to try another route, or pick a different server under Settings &rarr; Proxy &rarr; Wisp."}
 			Current server: <b id="server">unknown</b></p>
 		<div class="row">
 			<button onclick="location.reload()">Reload</button>
-			<a href="/pages/settings.html">Proxy settings</a>
+			<a href="/?launch=1" target="_top">Open Cherri</a>
 		</div>
 	</div>
 	<script>

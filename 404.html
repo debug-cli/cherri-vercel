@@ -97,7 +97,16 @@
         function rSearch(input) {
             let url = input;
             if (!url.includes(".") || url.includes(" ")) {
-                url = "https://search.brave.com/search?q=" + url;
+                const engine = localStorage.getItem("cherri_searchEngine") || "Google";
+                const searchUrls = {
+                    Google: "https://google.com/search?q=",
+                    DuckDuckGo: "https://duckduckgo.com/search?q=",
+                    Bing: "https://bing.com/search?q=",
+                    Startpage: "https://startpage.com/search?q=",
+                    Qwant: "https://qwant.com/search?q=",
+                    Brave: "https://search.brave.com/search?q=",
+                };
+                url = (searchUrls[engine] || searchUrls.Google) + encodeURIComponent(url);
             } else {
                 if (!url.startsWith("http://") && !url.startsWith("https://")) {
                     url = "https://" + url;
