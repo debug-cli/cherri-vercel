@@ -46,6 +46,49 @@ const serviceWorkerReady =
     ? navigator.serviceWorker.ready
     : Promise.resolve();
 
+/**
+ * `serviceWorker.ready` only guarantees an active registration; it does not mean
+ * this page is controlled yet. Scramjet's proxy URLs must be intercepted by the
+ * page's controller, or the static host returns its own 404 for every target.
+ *
+ * @returns {Promise<ServiceWorker>}
+ */
+function waitForServiceWorkerControl() {
+  const currentController = navigator.serviceWorker.controller;
+  if (currentController) return Promise.resolve(currentController);
+
+  return new Promise((resolve, reject) => {
+    let timeoutId;
+    const cleanup = () => {
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        onControllerChange
+      );
+      clearTimeout(timeoutId);
+    };
+    const onControllerChange = () => {
+      const controller = navigator.serviceWorker.controller;
+      if (!controller) return;
+      cleanup();
+      resolve(controller);
+    };
+
+    timeoutId = setTimeout(() => {
+      cleanup();
+      reject(
+        new Error(
+          "Scramjet's service worker is active but does not control this page. Reload the page so proxy requests can be intercepted."
+        )
+      );
+    }, 10000);
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      onControllerChange
+    );
+    onControllerChange();
+  });
+}
+
 /** Wisp endpoint the transport is currently connected to. */
 let wispUrl = null;
 let transportPromise = null;
@@ -90,19 +133,13 @@ async function createTransport(server) {
  */
 function initScramjetController() {
   scramjetControllerPromise ||= (async () => {
-    const registration = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
 
-    const sw =
-      navigator.serviceWorker.controller ||
-      registration.active ||
-      registration.waiting;
-
-    if (!sw) {
-      throw new Error(
-        "Scramjet needs a controlling service worker, but none became active."
-      );
-    }
+    // Do not initialize Scramjet against `registration.active` unless it is
+    // actually controlling this document: otherwise /~/sj/* requests fall
+    // through to the host's static 404 handler instead of reaching Scramjet.
+    const sw = await waitForServiceWorkerControl();
 
     const controller = new $scramjetController.Controller({
       serviceworker: sw,
