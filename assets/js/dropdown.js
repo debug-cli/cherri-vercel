@@ -1,9 +1,4 @@
 // thanks to https://waves.lat for custom dropdowns || https://gitlab.com/waveslab/waves
-const SEARCH_ENGINE_DEFAULT_MIGRATION = "cherri_searchEngineGoogleDefaultV1";
-if (!localStorage.getItem(SEARCH_ENGINE_DEFAULT_MIGRATION)) {
-  localStorage.setItem(SEARCH_ENGINE_DEFAULT_MIGRATION, "1");
-}
-
 const appSettings = {
   backend: localStorage.getItem("cherri_backend") || "Scramjet",
   searchEngine: localStorage.getItem("cherri_searchEngine") || "Google",
