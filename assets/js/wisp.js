@@ -1,5 +1,5 @@
 /**
- * cherri wisp helper
+ * graip wisp helper
  *
  * Every proxied request goes through the libcurl transport, which tunnels all
  * traffic over a single wisp WebSocket server. When that server is unreachable
@@ -127,13 +127,13 @@
 
   const KEYS = {
     /** Active endpoint. Always a validated ws(s) URL ending in "/". */
-    active: "cherri_wispUrl",
+    active: "graip_wispUrl",
     /** Preset id chosen from the settings dropdown. */
-    preset: "cherri_wispUrlSelected",
+    preset: "graip_wispUrlSelected",
     /** Last endpoint typed in by hand, kept so it can be retried later. */
-    custom: "cherri_wispUrlCustom",
+    custom: "graip_wispUrlCustom",
     /** Timestamp of the last successful handshake. */
-    verifiedAt: "cherri_wispUrlVerifiedAt",
+    verifiedAt: "graip_wispUrlVerifiedAt",
   };
 
   const DEFAULT_URL = PRESETS[0].url;
@@ -167,7 +167,7 @@
   }
 
   /**
-   * Turn whatever the user (or an older version of cherri) stored into a URL that
+   * Turn whatever the user (or an older version of graip) stored into a URL that
    * libcurl will accept: ws:// or wss:// scheme, trailing slash, nothing else.
    *
    * Anything that parses as a URL is returned, including a bare word (treated as
@@ -519,7 +519,7 @@
         if (selectionChanged && typeof global.dispatchEvent === "function") {
           try {
             global.dispatchEvent(
-              new CustomEvent("cherriWispServerChanged", { detail: result.url })
+              new CustomEvent("graipWispServerChanged", { detail: result.url })
             );
           } catch (error) {
             /* non-browser test environments may not provide CustomEvent */
@@ -601,18 +601,18 @@
       );
     }
 
-    if (global.CherriProxyErrors) {
-      const classification = global.CherriProxyErrors.classify(error);
+    if (global.GraipProxyErrors) {
+      const classification = global.GraipProxyErrors.classify(error);
       if (classification.kind === "connectivity") {
         return (
-          "cherri could not reach its proxy server (" +
+          "graip could not reach its proxy server (" +
           getConfiguredUrl() +
-          "). The server is either down or blocked on this network. cherri will keep " +
+          "). The server is either down or blocked on this network. graip will keep " +
           "trying the other servers on the list."
         );
       }
       if (classification.kind !== "other") {
-        return global.CherriProxyErrors.userMessage(classification);
+        return global.GraipProxyErrors.userMessage(classification);
       }
     }
 
@@ -622,9 +622,9 @@
 
     if (curlCode(error) === 7 || /could not connect to server/i.test(message)) {
       return (
-        "cherri could not reach its proxy server (" +
+        "graip could not reach its proxy server (" +
         getConfiguredUrl() +
-        "). The server is either down or blocked on this network. cherri will keep " +
+        "). The server is either down or blocked on this network. graip will keep " +
         "trying the other servers on the list."
       );
     }
@@ -632,7 +632,7 @@
     return message;
   }
 
-  global.CherriWisp = {
+  global.GraipWisp = {
     PRESETS,
     KEYS,
     DEFAULT_URL,

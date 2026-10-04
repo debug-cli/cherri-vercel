@@ -39,7 +39,7 @@ function createHarness(initialController = null) {
     setTimeout,
     clearTimeout,
     SCRAMJET_CONFIG: {},
-    CherriWisp: { getConfiguredUrl: () => "wss://wisp.example/" },
+    GraipWisp: { getConfiguredUrl: () => "wss://wisp.example/" },
     createTransport: async (url) => ({ url }),
     $scramjetController: {
       Controller: function (options) {

@@ -1,11 +1,11 @@
 // thanks to https://waves.lat for custom dropdowns || https://gitlab.com/waveslab/waves
 const appSettings = {
-  backend: localStorage.getItem("cherri_backend") || "Scramjet",
-  searchEngine: localStorage.getItem("cherri_searchEngine") || "Google",
+  backend: localStorage.getItem("graip_backend") || "Scramjet",
+  searchEngine: localStorage.getItem("graip_searchEngine") || "Google",
   decoy: localStorage.getItem("decoy") || "None",
-  wisp: localStorage.getItem("cherri_wispUrlSelected") || "Phantom",
-  theme: localStorage.getItem("cherri_theme") || "default",
-  store: localStorage.getItem("cherri_gameStore") || "Classplay",
+  wisp: localStorage.getItem("graip_wispUrlSelected") || "Phantom",
+  theme: localStorage.getItem("graip_theme") || "midnight",
+  store: localStorage.getItem("graip_gameStore") || "Classplay",
 };
 
 const searchEngineSelector = document.querySelector(".search-engine-selector");
@@ -147,7 +147,7 @@ const allDecoyOptions = [
   "Billibilli",
 ];
 
-const wispPresets = CherriWisp.PRESETS;
+const wispPresets = GraipWisp.PRESETS;
 const wispSelectablePresets = wispPresets.filter((preset) =>
   ["Phantom", "Mercury", "Definitely Science 1", "Anura 1", "Terbium 1"].includes(
     preset.id
@@ -161,10 +161,10 @@ const wispCustomSettings = document.querySelector(".wisp-custom-settings");
 const wispInput = document.querySelector(".wispInput");
 
 function selectedWispPreset() {
-  const selectedId = localStorage.getItem(CherriWisp.KEYS.preset);
+  const selectedId = localStorage.getItem(GraipWisp.KEYS.preset);
   if (selectedId === "Fallback" || selectedId === "Custom") return null;
 
-  const configured = CherriWisp.normalizeWispUrl(CherriWisp.getConfiguredUrl());
+  const configured = GraipWisp.normalizeWispUrl(GraipWisp.getConfiguredUrl());
   const configuredPreset = wispPresets.find((preset) => preset.url === configured);
   if (configuredPreset && configuredPreset.id !== selectedId) return configuredPreset;
   return wispPresets.find((preset) => preset.id === selectedId) || configuredPreset || null;
@@ -183,11 +183,11 @@ function availableWispPresets() {
 
 function updateWispSelector() {
   const preset = selectedWispPreset();
-  const activeUrl = CherriWisp.normalizeWispUrl(CherriWisp.getConfiguredUrl());
-  const customUrl = CherriWisp.normalizeWispUrl(
-    localStorage.getItem(CherriWisp.KEYS.custom)
+  const activeUrl = GraipWisp.normalizeWispUrl(GraipWisp.getConfiguredUrl());
+  const customUrl = GraipWisp.normalizeWispUrl(
+    localStorage.getItem(GraipWisp.KEYS.custom)
   );
-  const selection = localStorage.getItem(CherriWisp.KEYS.preset);
+  const selection = localStorage.getItem(GraipWisp.KEYS.preset);
   const isFallback = selection === "Fallback";
   const isCustom = selection === "Custom" && activeUrl === customUrl;
   const label = preset
@@ -202,7 +202,7 @@ function updateWispSelector() {
   wispSelected.setAttribute("aria-expanded", "false");
   wispCustomSettings.style.display = label === customWispOption ? "block" : "none";
   if (wispInput) {
-    wispInput.value = localStorage.getItem(CherriWisp.KEYS.custom) || "";
+    wispInput.value = localStorage.getItem(GraipWisp.KEYS.custom) || "";
   }
   if (typeof setCurrentWispServer === "function") {
     setCurrentWispServer(activeUrl);
@@ -211,16 +211,16 @@ function updateWispSelector() {
 
 function selectWisp(option) {
   if (option === customWispOption) {
-    const customUrl = localStorage.getItem(CherriWisp.KEYS.custom);
+    const customUrl = localStorage.getItem(GraipWisp.KEYS.custom);
     wispSelected.textContent = customWispOption;
     wispCustomSettings.style.display = "block";
     if (wispInput) wispInput.value = customUrl || "";
     if (customUrl) {
-      const url = CherriWisp.setActiveServer(customUrl, { custom: true });
+      const url = GraipWisp.setActiveServer(customUrl, { custom: true });
       if (url) {
-        CherriWisp.resetCache();
+        GraipWisp.resetCache();
         updateWispSelector();
-        setWispStatus("Selected; reload Cherri to use this route");
+        setWispStatus("Selected; reload Graip to use this route");
       }
     } else {
       setWispStatus("Enter a custom server URL, then select Set");
@@ -231,12 +231,12 @@ function selectWisp(option) {
   const preset = wispSelectablePresets.find((entry) => entry.name === option);
   if (!preset) return;
 
-  const url = CherriWisp.setActiveServer(preset.url);
+  const url = GraipWisp.setActiveServer(preset.url);
   if (!url) return;
-  localStorage.setItem(CherriWisp.KEYS.preset, preset.id);
-  CherriWisp.resetCache();
+  localStorage.setItem(GraipWisp.KEYS.preset, preset.id);
+  GraipWisp.resetCache();
   updateWispSelector();
-  setWispStatus("Selected; reload Cherri to use this route");
+  setWispStatus("Selected; reload Graip to use this route");
 }
 
 wispSelected.addEventListener("click", (event) => {
@@ -365,7 +365,7 @@ function applyDecoy(s) {
         s +
         " was selected"
     );
-    document.title = "cherri";
+    document.title = "graip";
     favicon.href = "/assets/img/fav.png";
     return;
   } else {
@@ -381,7 +381,7 @@ createSelector(
   searchEngineOptions,
   allSearchEngineOptions,
   appSettings.searchEngine,
-  "cherri_searchEngine",
+  "graip_searchEngine",
   null,
   "Successfully updated Search Engine!"
 );
@@ -403,7 +403,7 @@ createSelector(
   backendOptions,
   allBackendOptions,
   appSettings.backend,
-  "cherri_backend",
+  "graip_backend",
   "backendUpdated",
   "Successfully updated backend!"
 );
@@ -414,7 +414,7 @@ createSelector(
   themeOptions,
   allThemeOptions,
   appSettings.theme,
-  "cherri_theme",
+  "graip_theme",
   "themeUpdated",
   "Successfully updated theme! Refresh to see background change."
 );
@@ -425,7 +425,7 @@ createSelector(
   storeOptions,
   allStoreOptions,
   appSettings.store,
-  "cherri_gameStore",
+  "graip_gameStore",
   "storeUpdated",
   "Successfully updated game library!"
 );
@@ -444,7 +444,7 @@ document.addEventListener("themeUpdated", (e) => {
 document.addEventListener("wispUpdated", (e) => {
   selectWisp(e.detail);
 });
-document.addEventListener("cherriWispServerChanged", updateWispSelector);
+document.addEventListener("graipWispServerChanged", updateWispSelector);
 window.addEventListener("load", () => {
   applyDecoy(localStorage.getItem("decoy"));
   console.log("Cloaked as " + localStorage.getItem("decoy"));

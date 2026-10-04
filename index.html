@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width">
     <link rel="icon" type="image/svg+xml" href="/assets/img/fav.png">
-    <title>cherri</title>
+    <title>graip</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="/uv/uv.bundle.js"></script>
     <script src="/uv/uv.config.js"></script>
@@ -40,7 +40,7 @@
             window.location.replace('/start.html');
         }
     </script>
-    <meta name="title" content="Cherri">
+    <meta name="title" content="Graip">
     <meta name="description"
         content="A state of the art unblocked games website. Clean, customizable, and now in pink!">
     <meta name="keywords"
@@ -51,7 +51,7 @@
     <meta property="twitter:image" content="https://cherri.x8r.dev/assets/img/cover.png">
     <meta name="language" content="English">
     <meta name="revisit-after" content="2 days">
-    <meta name="author" content="x8r and Cherri Team">
+    <meta name="author" content="x8r and Graip Team">
     <script defer src="https://cloud.umami.is/script.js"
         data-website-id="aa852720-724b-4441-be4c-6db9ef160eb9"></script>
     <link rel="stylesheet" href="/assets/css/font.css">
@@ -134,7 +134,7 @@
             <!--
             <li class="divider"></li>
             <li style="width: 85px">
-                <a onclick="navTo('gmbl'); showToast('warning', 'Cherri in NO WAY encourages gambling, betting, or any actions of the kind. This is just a joke.', 'fas fa-exclamation-triangle')"
+                <a onclick="navTo('gmbl'); showToast('warning', 'Graip in NO WAY encourages gambling, betting, or any actions of the kind. This is just a joke.', 'fas fa-exclamation-triangle')"
                     href="#" data-page="gmbl">
                     <i class="far fa-slot-machine"
                         style="font-size: 17px; transform: translateY(40%); left: 10px;"></i><span
@@ -146,7 +146,7 @@
     </nav>
     <div id="homeContent">
         <h1 class="text-7xl font-medium home-gradient">
-            cherri</h1>
+            graip</h1>
         <p id="splash" class="text-medium font-light text-white/50">
             wsp
         </p>
@@ -339,7 +339,7 @@
                     </div>
 
                     <h2>about:blank</h2>
-                    <p>Create a new about:blank tab to hide Cherri from your history and filter.</p>
+                    <p>Create a new about:blank tab to hide Graip from your history and filter.</p>
                     <button onclick="
                         openAB()
                     " class="button"><i class="ri-external-link-line"></i>&nbsp;Open in about:blank</button>
@@ -411,7 +411,7 @@
                 <div id="settings-proxy" class="settings-page">
                     <h2>Wisp</h2>
                     <p>Choose a Wisp route. Public endpoints are community-operated and unofficial; availability and privacy are not guaranteed. The test checks only the Wisp handshake, not uptime or destination compatibility.</p>
-                    <p>When a selected route cannot connect, Cherri tries another route and marks it as an automatic fallback. Reload after changing the route to reconnect.</p>
+                    <p>When a selected route cannot connect, Graip tries another route and marks it as an automatic fallback. Reload after changing the route to reconnect.</p>
                     <p><b>Current server:</b> <span id="wispCurrentServer">Loading…</span></p>
                     <div class="wisp-selector">
                         <div class="wisp-selected" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false"></div>
@@ -472,8 +472,8 @@
                     <br>
 
                     <h2>Thank you!</h2>
-                    <p>Thanks for using Cherri! We hope you enjoyed your stay, and maybe star us on the <a
-                            href="https://github.com/x8rr/cherri" target="_blank">repository.</a></p>
+                    <p>Thanks for using Graip! We hope you enjoyed your stay, and maybe star us on the <a
+                            href="https://github.com/debug-cli/cherri-vercel" target="_blank">repository.</a></p>
                 </div>
 
                 <div id="settings-updates" class="settings-page">
@@ -487,7 +487,7 @@
                 </div>
             </div>
 
-            <p class="version-tag">cherri <a href="https://github.com/x8rr/cherri/releases/latest"
+            <p class="version-tag">graip <a href="https://github.com/debug-cli/cherri-vercel/releases/latest"
                     target="_blank">stable v1.1.1</a></p>
         </div>
     </div>
@@ -604,11 +604,11 @@
     <button id="reset-theme" onclick="resetTheme()">CLICK HERE TO RESET YOUR THEME!</button>
 
     <!-- site version -->
-    <cherriattr version="s1.1.1"></cherriattr>
+    <graipattr version="s1.1.1"></graipattr>
 
     <script src="/assets/js/dropdown.js"></script>
     <script>
-        const pjsOn = localStorage.getItem("cherri_particlesOn") ?? "yes"
+        const pjsOn = localStorage.getItem("graip_particlesOn") ?? "yes"
 
         if (pjsOn === "yes") {
             particlesJS.load("particles-container", "/assets/json/config/particles.json", () => {
@@ -621,7 +621,7 @@
     <script>
         // Both game stores ship in this repository, so the Games menu keeps
         // following whatever the user picked (Classplay by default).
-        const selectedStore = localStorage.getItem("cherri_gameStore") ?? "Classplay"
+        const selectedStore = localStorage.getItem("graip_gameStore") ?? "Classplay"
 
         async function gj(file) {
             const response = await fetch(`/assets/json/${file}.json`)
@@ -641,7 +641,7 @@
             // which fetch happened to finish last.
             gj(file).then(items => {
                 console.log(
-                    "%ccherri" + "%c recieved json data!",
+                    "%cgraip" + "%c recieved json data!",
                     "color: white; background: linear-gradient(to bottom right, #040c16, #000000); border-radius: 5px; font-weight: bold; padding: 6px; font-family: sans-serif;",
                     "color: white; background: transparent; border-radius: 0px; padding: 0px;"
                 )
@@ -665,7 +665,7 @@
                 })
                 observe()
             }).catch(error => {
-                console.error(`[cherri] ${type} list failed to load:`, error)
+                console.error(`[graip] ${type} list failed to load:`, error)
                 const aCont = document.querySelector(`.${type}-container`)
                 if (aCont && type === "games") {
                     aCont.innerHTML = `<p class="game-load-error">Games are temporarily unavailable. Reload to try again.</p>`
@@ -716,7 +716,7 @@
             if ("serviceWorker" in navigator) {
                 await navigator.serviceWorker.register("/uv/sw.js").then(() => {
                     console.log(
-                        "%ccherri" + "%c UV sw registered!",
+                        "%cgraip" + "%c UV sw registered!",
                         "color: white; background: linear-gradient(to bottom right, #040c16, #000000); border-radius: 5px; font-weight: bold; padding: 6px; font-family: sans-serif;",
                         "color: white; background: transparent; border-radius: 0px; padding: 0px;"
                     );
@@ -731,7 +731,7 @@
 
                 await navigator.serviceWorker.register("/sw.js").then(() => {
                     console.log(
-                        "%ccherri" + "%c SJ sw registered!",
+                        "%cgraip" + "%c SJ sw registered!",
                         "color: white; background: linear-gradient(to bottom right, #040c16, #000000); border-radius: 5px; font-weight: bold; padding: 6px; font-family: sans-serif;",
                         "color: white; background: transparent; border-radius: 0px; padding: 0px;"
                     );
@@ -784,7 +784,7 @@
                 if (!document.body.contains(contentFrame)) {
                     document.body.appendChild(contentFrame);
                 }
-                const overlayOn = localStorage.getItem("cherri_useOverlay") ?? "yes"
+                const overlayOn = localStorage.getItem("graip_useOverlay") ?? "yes"
                 const isGamePage = l.includes("/stores/") || l.startsWith("play.html?")
                 if (overlayOn === "yes" && isGamePage) {
                     document.querySelector("nav").style.opacity = 0
@@ -999,7 +999,7 @@
 
             let url = input;
             if (!url.includes(".") || url.includes(" ")) {
-                const searchEngine = localStorage.getItem("cherri_searchEngine") || "Google";
+                const searchEngine = localStorage.getItem("graip_searchEngine") || "Google";
                 const searchUrls = {
                     Google: "https://google.com/search?q=",
                     DuckDuckGo: "https://duckduckgo.com/search?q=",
@@ -1034,7 +1034,7 @@
     </script>
     <script defer>
         window.addEventListener("DOMContentLoaded", () => {
-            console.log("cherri: dom content loaded")
+            console.log("graip: dom content loaded")
             const homesearch = document.getElementById("homesearch");
 
             homesearch.addEventListener("keydown", (e) => {
@@ -1050,7 +1050,7 @@
     <script defer>
         const pjstoggle = document.getElementById("pjs-toggle")
         const pcont = document.getElementById("vanta-fog-container")
-        const pjsIsOn = localStorage.getItem("cherri_particlesOn") ?? "yes"
+        const pjsIsOn = localStorage.getItem("graip_particlesOn") ?? "yes"
 
         function updatePJS() {
             if (pjstoggle.checked) {
@@ -1058,7 +1058,7 @@
                 const newpjs = document.createElement("div")
                 newpjs.setAttribute("id", "vanta-fog-container")
                 document.body.append(newpjs)
-                localStorage.setItem("cherri_particlesOn", "yes")
+                localStorage.setItem("graip_particlesOn", "yes")
                 VANTA.FOG({
                     el: "#vanta-fog-container",
                     mouseControls: true,
@@ -1078,7 +1078,7 @@
                 const newpcont = document.getElementById("vanta-fog-container")
                 newpcont.remove()
                 console.log("unchecked")
-                localStorage.setItem("cherri_particlesOn", "no")
+                localStorage.setItem("graip_particlesOn", "no")
                 showToast("success", "Vanta is now off!", "fas fa-check-circle")
             }
         }
@@ -1091,16 +1091,16 @@
     </script>
     <script defer>
         const overlayToggle = document.getElementById("overlay-toggle")
-        const overlayIsOn = localStorage.getItem("cherri_useOverlay") ?? "yes"
+        const overlayIsOn = localStorage.getItem("graip_useOverlay") ?? "yes"
 
         function updateOverlaySettings() {
             if (overlayToggle.checked) {
                 console.log("checked")
                 showToast("success", "Game overlay is now on!", "fas fa-check-circle")
-                localStorage.setItem("cherri_useOverlay", "yes")
+                localStorage.setItem("graip_useOverlay", "yes")
             } else {
                 console.log("unchecked")
-                localStorage.setItem("cherri_useOverlay", "no")
+                localStorage.setItem("graip_useOverlay", "no")
                 showToast("success", "Game overlay is now off!", "fas fa-check-circle")
             }
         }
@@ -1112,22 +1112,22 @@
         }
     </script>
     <script defer>
-        const cherriAttr = document.querySelector("cherriattr")
-        const siteVersion = cherriAttr.getAttribute("version")
-        const savedVer = localStorage.getItem("cherri_siteVersion") ?? ""
+        const graipAttr = document.querySelector("graipattr")
+        const siteVersion = graipAttr.getAttribute("version")
+        const savedVer = localStorage.getItem("graip_siteVersion") ?? ""
 
         window.addEventListener("DOMContentLoaded", () => {
             if (savedVer === null || !savedVer) {
-                showToast("success", "Welcome to Cherri!", "fas fa-hand-wave")
-                localStorage.setItem("cherri_siteVersion", siteVersion)
+                showToast("success", "Welcome to Graip!", "fas fa-hand-wave")
+                localStorage.setItem("graip_siteVersion", siteVersion)
             } else if (savedVer !== siteVersion) {
-                showToast("success", "Cherri was updated! Check settings for more info.", "fas fa-check-circle")
-                localStorage.setItem("cherri_siteVersion", siteVersion)
+                showToast("success", "Graip was updated! Check settings for more info.", "fas fa-check-circle")
+                localStorage.setItem("graip_siteVersion", siteVersion)
             }
         })
 
         function resetTheme() {
-            localStorage.setItem("cherri_theme", "default")
+            localStorage.setItem("graip_theme", "midnight")
             window.location.reload()
         }
 
@@ -1147,16 +1147,16 @@
         }
 
         const abToggle = document.getElementById("cloak-toggle")
-        const abOn = localStorage.getItem("cherri_autoAB") ?? "no"
+        const abOn = localStorage.getItem("graip_autoAB") ?? "no"
 
         function updateABSettings() {
             if (abToggle.checked) {
                 console.log("checked")
                 showToast("success", "Auto cloaking is now on!", "fas fa-check-circle")
-                localStorage.setItem("cherri_autoAB", "yes")
+                localStorage.setItem("graip_autoAB", "yes")
             } else {
                 console.log("unchecked")
-                localStorage.setItem("cherri_autoAB", "no")
+                localStorage.setItem("graip_autoAB", "no")
                 showToast("success", "Auto cloaking is now off!", "fas fa-check-circle")
             }
         }
@@ -1167,11 +1167,11 @@
             abToggle.checked = false
         }
 
-        if (localStorage.getItem("cherri_autoAB") === "yes") {
+        if (localStorage.getItem("graip_autoAB") === "yes") {
             openAB()
         }
 
-        const confirmLeaveOn = localStorage.getItem("cherri_confirmLeave") ?? "no"
+        const confirmLeaveOn = localStorage.getItem("graip_confirmLeave") ?? "no"
         const confirmLeaveToggle = document.getElementById("confirm-leave-toggle")
 
         if (confirmLeaveOn === "yes") {
@@ -1184,22 +1184,22 @@
             if (confirmLeaveToggle.checked) {
                 console.log("checked")
                 showToast("success", "Confirm leave is now on!", "fas fa-check-circle")
-                localStorage.setItem("cherri_confirmLeave", "yes")
+                localStorage.setItem("graip_confirmLeave", "yes")
             } else {
                 console.log("unchecked")
-                localStorage.setItem("cherri_confirmLeave", "no")
+                localStorage.setItem("graip_confirmLeave", "no")
                 showToast("success", "Confirm leave is now off!", "fas fa-check-circle")
             }
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("cherri_confirmLeave") === "yes") {
+            if (localStorage.getItem("graip_confirmLeave") === "yes") {
                 e.preventDefault()
                 e.returnValue = ""
             }
         })
 
-        const cursorOn = localStorage.getItem("cherri_customCursor") ?? "yes"
+        const cursorOn = localStorage.getItem("graip_customCursor") ?? "yes"
         const cursorToggle = document.getElementById("cursor-toggle")
 
         if (cursorOn === "yes") {
@@ -1212,7 +1212,7 @@
             if (cursorToggle.checked) {
                 console.log("checked")
                 showToast("success", "Custom cursor is now on!", "fas fa-check-circle")
-                localStorage.setItem("cherri_customCursor", "yes")
+                localStorage.setItem("graip_customCursor", "yes")
                 cursor()
             } else {
                 console.log("unchecked")
@@ -1222,13 +1222,13 @@
                 if (mouseMoveHandler) window.removeEventListener("mousemove", mouseMoveHandler)
                 if (messageHandler) window.removeEventListener("message", messageHandler)
                 if (hideInterval) clearInterval(hideInterval)
-                localStorage.setItem("cherri_customCursor", "no")
+                localStorage.setItem("graip_customCursor", "no")
                 showToast("success", "Custom cursor is now off!", "fas fa-check-circle")
             }
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("cherri_confirmLeave") === "yes") {
+            if (localStorage.getItem("graip_confirmLeave") === "yes") {
                 e.preventDefault()
                 e.returnValue = ""
             }
@@ -1255,7 +1255,7 @@
             return parseInt(hex.replace("#", ""), 16)
         }
 
-        const useFog = localStorage.getItem("cherri_particlesOn") ?? "yes"
+        const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
         if (useFog === "yes") {
             VANTA.FOG({
                 el: "#vanta-fog-container",
@@ -1300,24 +1300,24 @@
 
         // Keep the last custom URL ready when the user switches back to custom mode.
         const wispInputEl = document.querySelector(".wispInput")
-        if (wispInputEl && typeof CherriWisp !== "undefined") {
-            wispInputEl.value = localStorage.getItem(CherriWisp.KEYS.custom) || ""
+        if (wispInputEl && typeof GraipWisp !== "undefined") {
+            wispInputEl.value = localStorage.getItem(GraipWisp.KEYS.custom) || ""
         }
-        if (typeof CherriWisp !== "undefined") {
-            setCurrentWispServer(CherriWisp.getConfiguredUrl())
+        if (typeof GraipWisp !== "undefined") {
+            setCurrentWispServer(GraipWisp.getConfiguredUrl())
         }
-        document.addEventListener("cherriWispServerChanged", (event) => {
+        document.addEventListener("graipWispServerChanged", (event) => {
             setCurrentWispServer(event.detail)
             if (typeof updateWispSelector === "function") updateWispSelector()
         })
 
         function testWispServer() {
-            const url = CherriWisp.getConfiguredUrl()
+            const url = GraipWisp.getConfiguredUrl()
 
-            CherriWisp.resetCache()
+            GraipWisp.resetCache()
             setWispStatus("Testing...")
 
-            CherriWisp.probeWispServer(url).then((result) => {
+            GraipWisp.probeWispServer(url).then((result) => {
                 setWispStatus(result.ok ? `Online (${result.ms}ms)` : `Unreachable (${result.reason})`)
             })
         }
@@ -1330,7 +1330,7 @@
 
             // normalizing, saving and health checking all live in wisp.js, so this
             // box, the dropdown and the browser agree on one server
-            const url = CherriWisp.setActiveServer(i, { custom: true })
+            const url = GraipWisp.setActiveServer(i, { custom: true })
 
             if (!url) {
                 setWispStatus("Invalid URL")
@@ -1341,16 +1341,16 @@
             if (wispInputEl) wispInputEl.value = url
             setCurrentWispServer(url)
             if (typeof updateWispSelector === "function") updateWispSelector()
-            CherriWisp.resetCache()
+            GraipWisp.resetCache()
             setWispStatus("Testing...")
 
-            CherriWisp.probeWispServer(url).then((result) => {
+            GraipWisp.probeWispServer(url).then((result) => {
                 if (result.ok) {
                     setWispStatus(`Online (${result.ms}ms)`)
                     showToast("success", `Wisp server is online (${result.ms}ms). Reload to use it.`, "fas fa-check-circle")
                 } else {
                     setWispStatus(`Unreachable (${result.reason})`)
-                    showToast("error", "That wisp server did not answer. cherri will fall back to the others automatically.", "fas fa-triangle-exclamation")
+                    showToast("error", "That wisp server did not answer. graip will fall back to the others automatically.", "fas fa-triangle-exclamation")
                 }
             })
         }

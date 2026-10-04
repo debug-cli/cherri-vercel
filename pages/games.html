@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cherri | games</title>
+    <title>graip | games</title>
     <link rel="shortcut icon" href="/assets/img/fav.png" type="image/x-icon" id="tabIcon">
     <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <link rel="stylesheet" href="/assets/css/elements.css">
@@ -73,7 +73,7 @@
                         </a>
                     </li>
                     <li>
-                        <a style="cursor: pointer;" onclick="window.open('https://github.com/x8rr/cherri/releases/latest', '_blank')">
+                        <a style="cursor: pointer;" onclick="window.open('https://github.com/debug-cli/cherri-vercel/releases/latest', '_blank')">
                             <i class="ri ri-github-fill"></i>
                             Beta 2.2
                         </a>
@@ -283,7 +283,7 @@
             // Follow whichever store the Games menu is set to. Both Classplay
             // (UCP) and GN-Math ship in this repository and use the same listing
             // shape, so the standalone page matches the home page menu.
-            const store = (localStorage.getItem('cherri_gameStore') || 'Classplay').toLowerCase();
+            const store = (localStorage.getItem('graip_gameStore') || 'Classplay').toLowerCase();
             res = await fetch(`/assets/json/${store}.json`);
             if (!res.ok) throw new Error(`Games could not be loaded (${res.status})`);
             return res.json();
@@ -313,7 +313,7 @@
                     acont.appendChild(appDiv);
                 });
             }).catch(error => {
-                console.error('[cherri] games page failed to load:', error);
+                console.error('[graip] games page failed to load:', error);
                 acont.innerHTML = '<p>Games are temporarily unavailable. Reload to try again.</p>';
             });
         }

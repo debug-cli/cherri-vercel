@@ -12,7 +12,7 @@ const source = fs.readFileSync(
 );
 const context = vm.createContext({});
 vm.runInContext(source, context, { filename: "assets/js/proxy-errors.js" });
-const errors = context.CherriProxyErrors;
+const errors = context.GraipProxyErrors;
 
 test("classifies peer verification, tls, connectivity, runtime, and unknown errors", () => {
   assert.deepEqual(

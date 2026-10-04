@@ -71,7 +71,7 @@ function createHarness() {
       var scramjetFrameFor = async (tabId) => ({ go: (target) => calls.push({ kind: "navigate", tabId, target }) });
       var setTabError = (message, tabId) => calls.push({ kind: "error", message, tabId });
       var recoveryAttempts = new Map();
-      var CherriWisp = { describeError: String };
+      var GraipWisp = { describeError: String };
       var updateUrlFromIframe = (frame, tabId) => calls.push({ kind: "url-update", tabId });
       ${goSource}
       globalThis.testGo = go;

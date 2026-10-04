@@ -179,8 +179,8 @@ function blockedTarget(requestUrl) {
  */
 function transportErrorPage(event, error) {
 	const message = (error && error.message) || String(error);
-	const classification = CherriProxyErrors.classify(error);
-	const userMessage = escapeHtml(CherriProxyErrors.userMessage(classification));
+	const classification = GraipProxyErrors.classify(error);
+	const userMessage = escapeHtml(GraipProxyErrors.userMessage(classification));
 	const isPeerVerificationFailure = classification.kind === "peer-verification";
 	const isTlsFailure = classification.kind === "tls-handshake";
 	const isWasmFailure = classification.kind === "runtime";
@@ -198,11 +198,11 @@ function transportErrorPage(event, error) {
 	const target = proxiedTarget(event.request.url);
 
 	const html = `<!DOCTYPE html>
-<html lang="en" data-cherri-proxy-error="1">
+<html lang="en" data-graip-proxy-error="1">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cherri | proxy error</title>
+<title>graip | proxy error</title>
 <style>
 	:root { color-scheme: dark; }
 	body {
@@ -269,22 +269,22 @@ function transportErrorPage(event, error) {
 			: isTlsFailure
 			? "The selected proxy route could not finish the site's TLS handshake. A different Wisp route may work."
 			: isPeerVerificationFailure
-			? `${userMessage} Try another Wisp route. Cherri retries once on a different route and keeps certificate verification enabled.`
-			: "cherri tunnels every page through a Wisp server, and that server did not answer. It may be offline or blocked on this network."}</p>
+			? `${userMessage} Try another Wisp route. Graip retries once on a different route and keeps certificate verification enabled.`
+			: "graip tunnels every page through a Wisp server, and that server did not answer. It may be offline or blocked on this network."}</p>
 		<p>Requested: <b>${escapeHtml(target)}</b></p>
-		<code id="cherri-proxy-message">${escapeHtml(message)}</code>
+		<code id="graip-proxy-message">${escapeHtml(message)}</code>
 			<p>${isWasmFailure
 				? "Reload to retry the proxy runtime, or open Settings &rarr; Proxy &rarr; Wisp."
 				: "Reload to try another route, or pick a different server under Settings &rarr; Proxy &rarr; Wisp."}
 			Current server: <b id="server">unknown</b></p>
 		<div class="row">
 			<button onclick="location.reload()">Reload</button>
-			<a href="/?launch=1" target="_top">Open Cherri</a>
+			<a href="/?launch=1" target="_top">Open Graip</a>
 		</div>
 	</div>
 	<script>
 		try {
-			var stored = localStorage.getItem("cherri_wispUrl");
+			var stored = localStorage.getItem("graip_wispUrl");
 			if (stored) document.getElementById("server").textContent = stored;
 		} catch (e) {}
 	</script>
@@ -352,13 +352,13 @@ async function handleRequest(event) {
 	try {
 		response = await $scramjetController.route(event);
 	} catch (error) {
-		console.error("[cherri] proxy fetch failed:", error);
+		console.error("[graip] proxy fetch failed:", error);
 		return transportErrorPage(event, error);
 	}
 
 	const renderedTransportError = await findTransportError(response);
 	if (renderedTransportError) {
-		console.error("[cherri] proxy destination request failed:", renderedTransportError);
+		console.error("[graip] proxy destination request failed:", renderedTransportError);
 		return transportErrorPage(event, new Error(renderedTransportError));
 	}
 

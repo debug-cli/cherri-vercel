@@ -43,7 +43,7 @@ function createHarness() {
       console.warn = function (message) { logs.push(message); };
       var frames = new Map([[1, { id: 1 }], [2, { id: 2 }]]);
       var document = { querySelector: (selector) => selector.includes('"2"') ? frames.get(2) : frames.get(1) };
-      var CherriWisp = { describeError: String };
+      var GraipWisp = { describeError: String };
       var resolveTransport;
       var ensureTransport = function (_force, options) {
         calls.push({ kind: "transport", exclude: Array.from(options.exclude) });

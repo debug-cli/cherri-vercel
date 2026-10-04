@@ -75,7 +75,7 @@
     return classification.kind === "peer-verification" ? 2 : 6;
   }
 
-  global.CherriProxyErrors = {
+  global.GraipProxyErrors = {
     classify,
     userMessage,
     shouldRetryRoute,

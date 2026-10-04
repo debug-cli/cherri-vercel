@@ -55,7 +55,7 @@ function createWispHarness() {
 
   vm.runInNewContext(source, context, { filename: "assets/js/wisp.js" });
 
-  return { wisp: window.CherriWisp, values, sockets };
+  return { wisp: window.GraipWisp, values, sockets };
 }
 
 test("normalizes_wisp_urls", () => {

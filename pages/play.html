@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cherri | play</title>
+    <title>graip | play</title>
     <link rel="shortcut icon" href="/assets/img/fav.png" type="image/x-icon" id="tabIcon">
     <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <link rel="stylesheet" href="/assets/css/elements.css">
@@ -196,7 +196,7 @@
     </div>
 
     <div id="gameOverlay" class="">
-        <div class="cherri-info">
+        <div class="graip-info">
             <span id="currentTime">Loading time...</span>
             <span class="divider"></span>
             <span id="temperature">Loading temp...</span>
@@ -321,7 +321,7 @@
             gameframe.focus();
         }
 
-        const useOverlay = localStorage.getItem("cherri_useOverlay") ?? "yes"
+        const useOverlay = localStorage.getItem("graip_useOverlay") ?? "yes"
 
         if (useOverlay === "yes") {
             initOverlay()
@@ -412,7 +412,7 @@
 
                     try {
                         const handle = await window.showSaveFilePicker({
-                            suggestedName: "Cherri_Game_Recording" + Date.now() + ".mp4",
+                            suggestedName: "Graip_Game_Recording" + Date.now() + ".mp4",
                             types: [{
                                 description: "Video Files",
                                 accept: { "video/mp4": [".mp4"] }

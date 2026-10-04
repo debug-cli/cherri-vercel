@@ -1,5 +1,5 @@
 const COOLDOWN = 20 * 60 * 1000;
-const STORAGE_KEY = "cherri_vm_cooldown";
+const STORAGE_KEY = "graip_vm_cooldown";
 
 function getRemaining() {
   const start = parseInt(localStorage.getItem(STORAGE_KEY));

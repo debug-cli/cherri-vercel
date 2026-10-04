@@ -1,4 +1,4 @@
-const useCursor = localStorage.getItem("cherri_customCursor") ?? "yes";
+const useCursor = localStorage.getItem("graip_customCursor") ?? "yes";
 
 let animationId = null;
 let mouseMoveHandler = null;

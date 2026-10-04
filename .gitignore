@@ -31,12 +31,12 @@ pnpm-debug.log*
 KEYS.json
 KEYS.json*
 
-./cherri-umami-worker
+./graip-umami-worker
 
-/cherri-umami-worker
-cherri-umami-worker/
+/graip-umami-worker
+graip-umami-worker/
 
-./cherri-cometchat-worker
+./graip-cometchat-worker
 
-/cherri-cometchat-worker
-cherri-cometchat-worker/
+/graip-cometchat-worker
+graip-cometchat-worker/

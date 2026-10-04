@@ -44,7 +44,7 @@ function createServiceWorkerHarness(route) {
     let responsePromise;
     const event = {
       request: {
-        url: "https://cherri.test/~/sj/https%3A%2F%2Fstellar.gdn%2F",
+        url: "https://graip.test/~/sj/https%3A%2F%2Fstellar.gdn%2F",
         mode,
         headers: { get: (name) => (name === "accept" ? accept : null) },
       },

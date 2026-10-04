@@ -4,16 +4,16 @@ let bTabs = [];
 // bare-mux is only used by the Ultraviolet backend now
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 
-const SEARCH_ENGINE_DEFAULT_MIGRATION = "cherri_searchEngineGoogleDefaultV1";
+const SEARCH_ENGINE_DEFAULT_MIGRATION = "graip_searchEngineGoogleDefaultV1";
 if (!localStorage.getItem(SEARCH_ENGINE_DEFAULT_MIGRATION)) {
-  if (localStorage.getItem("cherri_searchEngine") === "DuckDuckGo") {
-    localStorage.setItem("cherri_searchEngine", "Google");
+  if (localStorage.getItem("graip_searchEngine") === "DuckDuckGo") {
+    localStorage.setItem("graip_searchEngine", "Google");
   }
   localStorage.setItem(SEARCH_ENGINE_DEFAULT_MIGRATION, "1");
 }
 
 let searchE;
-const se = localStorage.getItem("cherri_searchEngine") || "Google";
+const se = localStorage.getItem("graip_searchEngine") || "Google";
 
 if (se === "DuckDuckGo") {
   searchE = "https://duckduckgo.com/search?q=";
@@ -143,7 +143,7 @@ function initScramjetController() {
 
     const controller = new $scramjetController.Controller({
       serviceworker: sw,
-      transport: await createTransport(CherriWisp.getConfiguredUrl()),
+      transport: await createTransport(GraipWisp.getConfiguredUrl()),
       config: SCRAMJET_CONFIG,
     });
 
@@ -179,7 +179,7 @@ async function scramjetFrameFor(tabId, element) {
   return frame;
 }
 
-/** CherriWisp points a wisp server that answered at whatever transport is in use. */
+/** GraipWisp points a wisp server that answered at whatever transport is in use. */
 const transportTarget = {
   async setTransport(server) {
     const controller = await initScramjetController();
@@ -203,13 +203,13 @@ function ensureTransport(force, options) {
     return transportPromise;
   }
 
-  transportPromise = CherriWisp.configureTransport(transportTarget, {
+  transportPromise = GraipWisp.configureTransport(transportTarget, {
     force,
     exclude: options && options.exclude,
     onStatus: (status) => {
       if (status.phase === "failed") {
         console.warn(
-          `[cherri] wisp server ${status.result.url} is unreachable (${status.result.reason})`
+          `[graip] wisp server ${status.result.url} is unreachable (${status.result.reason})`
         );
       }
     },
@@ -228,9 +228,9 @@ function ensureTransport(force, options) {
 
 // warm the transport up on load so the first navigation does not pay for it
 ensureTransport().catch((error) => {
-  console.error("[cherri] proxy transport unavailable:", error);
+  console.error("[graip] proxy transport unavailable:", error);
   if (typeof showToast === "function") {
-    showToast("error", CherriWisp.describeError(error), "triangle-exclamation");
+    showToast("error", GraipWisp.describeError(error), "triangle-exclamation");
   }
 });
 
@@ -239,7 +239,7 @@ ensureTransport().catch((error) => {
  */
 function isUltravioletBackend() {
   return (
-    (localStorage.getItem("cherri_backend") || "").toLowerCase() ===
+    (localStorage.getItem("graip_backend") || "").toLowerCase() ===
       "ultraviolet" && typeof __uv$config !== "undefined"
   );
 }
@@ -295,7 +295,7 @@ function newTab() {
   // worker first, so this happens as soon as it is ready and navigation waits
   // for it anyway.
   scramjetFrameFor(nTab.id, tabFrame).catch((error) => {
-    console.error("[cherri] could not register the tab with Scramjet:", error);
+    console.error("[graip] could not register the tab with Scramjet:", error);
   });
 
   tabFrame.src = "/newtab.html";
@@ -433,6 +433,7 @@ async function go(target, tabId = aTab) {
     if (titleEl) titleEl.textContent = "Loading...";
   }
 
+  if (!cTab) return;
   if (ubar && tabId === aTab) ubar.value = cTab.url;
   if (favEl) {
     const faviconDomain = new URL(cTab.url).hostname;
@@ -449,8 +450,8 @@ async function go(target, tabId = aTab) {
       ensureTransport(),
     ]);
   } catch (error) {
-    console.error("[cherri] proxy transport unavailable:", error);
-    setTabError(CherriWisp.describeError(error), tabId);
+    console.error("[graip] proxy transport unavailable:", error);
+    setTabError(GraipWisp.describeError(error), tabId);
     return;
   }
 
@@ -464,8 +465,8 @@ async function go(target, tabId = aTab) {
         // which is how a server that dies mid-session gets noticed
         if (iframeDoc && iframeDoc.documentElement) {
           const marker = iframeDoc.documentElement.dataset;
-          if (marker && marker.cherriProxyError) {
-            const detail = iframeDoc.getElementById("cherri-proxy-message");
+          if (marker && marker.graipProxyError) {
+            const detail = iframeDoc.getElementById("graip-proxy-message");
             handleProxyFailure(detail && detail.textContent, tabId);
             return;
           }
@@ -510,7 +511,7 @@ async function go(target, tabId = aTab) {
     }
   } catch (e) {
     console.error("There was an error while loading the page:", e);
-    setTabError(CherriWisp.describeError(e), tabId);
+    setTabError(GraipWisp.describeError(e), tabId);
   }
 }
 
@@ -551,21 +552,21 @@ async function handleProxyFailure(message, tabId = aTab) {
       : new Set();
 
   const errorMessage = message || "";
-  const classification = globalThis.CherriProxyErrors
-    ? globalThis.CherriProxyErrors.classify(errorMessage)
+  const classification = globalThis.GraipProxyErrors
+    ? globalThis.GraipProxyErrors.classify(errorMessage)
     : { kind: "other", message: errorMessage };
   const isPeerVerificationFailure = classification.kind === "peer-verification";
   const isRuntimeFailure = classification.kind === "runtime";
   const isTlsFailure = classification.kind === "tls-handshake";
   const isConnectivityFailure = classification.kind === "connectivity";
-  const isRetryableRouteFailure = globalThis.CherriProxyErrors
-    ? globalThis.CherriProxyErrors.shouldRetryRoute(classification)
+  const isRetryableRouteFailure = globalThis.GraipProxyErrors
+    ? globalThis.GraipProxyErrors.shouldRetryRoute(classification)
     : isTlsFailure || isConnectivityFailure;
 
   if (isPeerVerificationFailure || isRuntimeFailure) {
-    const detail = globalThis.CherriProxyErrors
-      ? globalThis.CherriProxyErrors.userMessage(classification)
-      : CherriWisp.describeError(errorMessage);
+    const detail = globalThis.GraipProxyErrors
+      ? globalThis.GraipProxyErrors.userMessage(classification)
+      : GraipWisp.describeError(errorMessage);
     if (!isPeerVerificationFailure) {
       setTabError(detail, tabId);
       return;
@@ -573,8 +574,8 @@ async function handleProxyFailure(message, tabId = aTab) {
 
     if (wispUrl) attempts.add(wispUrl);
     if (target) recoveryAttempts.set(tabId, { target, attempts });
-    const maxAttempts = globalThis.CherriProxyErrors
-      ? globalThis.CherriProxyErrors.maxRouteAttempts(classification)
+    const maxAttempts = globalThis.GraipProxyErrors
+      ? globalThis.GraipProxyErrors.maxRouteAttempts(classification)
       : 2;
     const canRetry = Boolean(wispUrl) && attempts.size < maxAttempts;
     setTabError(
@@ -601,8 +602,8 @@ async function handleProxyFailure(message, tabId = aTab) {
 
   if (!isRetryableRouteFailure || !target || !viewframe) return;
 
-  const maxAttempts = globalThis.CherriProxyErrors
-    ? globalThis.CherriProxyErrors.maxRouteAttempts(classification)
+  const maxAttempts = globalThis.GraipProxyErrors
+    ? globalThis.GraipProxyErrors.maxRouteAttempts(classification)
     : 6;
   return retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId);
 }
@@ -627,7 +628,7 @@ async function retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId) 
     /* Never log a full URL; malformed input has no safe hostname to report. */
   }
   console.warn(
-    `[cherri] proxy route ${wispUrl || "unknown"} failed for ${targetHost}; trying another route`
+    `[graip] proxy route ${wispUrl || "unknown"} failed for ${targetHost}; trying another route`
   );
 
   recoveryPromise = ensureTransport(true, {
@@ -640,13 +641,13 @@ async function retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId) 
       const currentTab = bTabs.find((tab) => tab.id === tabId);
       if (currentTab && currentTab.url === target) {
         // The new transport is ready. Reload only this failed tab, not the
-        // whole cherri page, so other tabs and their sessions stay intact.
+        // whole graip page, so other tabs and their sessions stay intact.
         go(target, tabId);
       }
       return nextUrl;
     })
     .catch((error) => {
-      console.error("[cherri] could not find another proxy route:", error);
+      console.error("[graip] could not find another proxy route:", error);
       setTabError(
         "No working proxy route was found. Try Settings -> Proxy -> Wisp.",
         tabId
@@ -703,12 +704,14 @@ function full() {
   const viewframe = document.querySelector(
     `.viewframe[data-frame-id="${aTab}"]`
   );
+  if (!viewframe) return;
   viewframe.requestFullscreen();
 }
 
 function hideBrowser() {
   const b = document.querySelector(".browser-container");
   const frames = document.querySelectorAll(".viewframe");
+  if (!b) return;
   b.style.opacity = 0;
   frames.forEach((frame) => {
     frame.style.opacity = 0;
