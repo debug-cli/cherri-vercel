@@ -1510,36 +1510,68 @@
 
         const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
         if (useFog === "yes") {
-            VANTA.FOG({
-                el: "#vanta-fog-container",
-                mouseControls: true,
-                touchControls: true,
-                gyroControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                highlightColor: hexToNumber(cssVar("--accent")),
-                midtoneColor: hexToNumber(cssVar("--bg-2")),
-                lowlightColor: hexToNumber(cssVar("--bg-5")),
-                baseColor: hexToNumber(cssVar("--bg")),
-                blurFactor: 0.90,
-                speed: 1
-            })
+            // WebGL is missing on some school devices and in embedded webviews;
+            // an uncaught throw here used to abort the rest of this script block
+            // (visitor counter, Wisp status, the settings forms below).
+            try {
+                VANTA.FOG({
+                    el: "#vanta-fog-container",
+                    mouseControls: true,
+                    touchControls: true,
+                    gyroControls: false,
+                    minHeight: 200.00,
+                    minWidth: 200.00,
+                    highlightColor: hexToNumber(cssVar("--accent")),
+                    midtoneColor: hexToNumber(cssVar("--bg-2")),
+                    lowlightColor: hexToNumber(cssVar("--bg-5")),
+                    baseColor: hexToNumber(cssVar("--bg")),
+                    blurFactor: 0.90,
+                    speed: 1
+                })
+            } catch (error) {
+                // cosmetic effect only: say so in the log, keep the page working
+                window.GraipLog && window.GraipLog.warn("ui", "fog background unavailable", {
+                    error: (error && error.message) || String(error),
+                })
+            }
         }
 
-        async function getActiveUsers() {
-            const endpoint = "https://api.x8r.dev/api/umami"
-            const res = await fetch(endpoint)
-            const data = await res.json()
+        /**
+         * Visitor counter.
+         *
+         * The counter endpoint belonged to the upstream author's server and has
+         * been gone for a long time: an unguarded fetch here threw once on load
+         * and again every 30 s, which filled the debug log and left the number
+         * frozen at 0. A dead counter is cosmetic, so it now degrades to a dash
+         * and stops polling after three failures.
+         */
+        let userCountFailures = 0
+        let userCountTimer = null
 
-            console.log("CURRENT VISITORS:" + data.visitors)
-            document.getElementById("user-count").textContent = data.visitors
+        async function getActiveUsers() {
+            const el = document.getElementById("user-count")
+            try {
+                const res = await fetch("https://api.x8r.dev/api/umami")
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const data = await res.json()
+                if (!data || typeof data.visitors !== "number") throw new Error("unexpected payload")
+                userCountFailures = 0
+                if (el) el.textContent = String(data.visitors)
+                return data.visitors
+            } catch (error) {
+                userCountFailures++
+                if (el) el.textContent = "—"
+                window.GraipLog && window.GraipLog.debug("stats", "visitor counter unavailable", {
+                    attempt: userCountFailures,
+                    error: (error && error.message) || String(error),
+                })
+                if (userCountFailures >= 3) clearInterval(userCountTimer)
+                return null
+            }
         }
 
         getActiveUsers()
-
-        setInterval(() => {
-            getActiveUsers()
-        }, 30000)
+        userCountTimer = setInterval(getActiveUsers, 30000)
 
         function setWispStatus(text) {
             const el = document.getElementById("wispStatus")

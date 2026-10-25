@@ -124,7 +124,11 @@
 
             homeContent.classList.add('hidden');
             contentFrame.classList.add('active');
-            contentFrame.src = "/pages/ultraviolet.html?i=" + url;
+            // This pointed at /pages/ultraviolet.html, which has never existed
+            // in this repository. The markup no longer has a #homesearch input,
+            // so nothing calls this today -- but if the search box comes back it
+            // must land on the real browsing page, which takes ?launch=.
+            contentFrame.src = "/pages/browser.html?launch=" + encodeURIComponent(url);
             location.href = "#?i=" + url
         }
 

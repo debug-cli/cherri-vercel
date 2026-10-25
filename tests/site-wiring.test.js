@@ -166,3 +166,34 @@ test("scramjet and ultraviolet service workers are both registered where the bro
   }
   assert.match(read("index.html"), /\/uv\/sw\.js/);
 });
+
+test("no first-party page navigates to a page that does not exist", () => {
+  // 404.html used to send searches to /pages/ultraviolet.html, a file that has
+  // never existed here, so every search from the not-found page hit a 404.
+  const seen = new Set();
+  const broken = [];
+
+  for (const page of PAGES.concat("panic.html")) {
+    const source = read(page);
+    for (const [, target] of source.matchAll(/["'`]\/?(pages\/[A-Za-z0-9_-]+\.html)/g)) {
+      seen.add(target);
+      if (!exists(target)) broken.push(`${page} -> ${target}`);
+    }
+  }
+
+  assert.deepEqual(broken, [], `pages referenced but missing: ${broken.join(", ")}`);
+  assert.ok(seen.has("pages/browser.html"), "expected the browser page to be referenced somewhere");
+  assert.ok(seen.has("pages/play.html"), "expected the play page to be referenced somewhere");
+});
+
+test("the visitor counter degrades instead of throwing when its endpoint is gone", () => {
+  const home = read("index.html");
+
+  // the endpoint belongs to the upstream author and no longer answers
+  assert.match(home, /api\.x8r\.dev\/api\/umami/);
+  const block = home.slice(home.indexOf("async function getActiveUsers"), home.indexOf("userCountTimer = setInterval"));
+  assert.match(block, /try \{/, "the counter fetch must be guarded");
+  assert.match(block, /catch \(error\)/, "a dead endpoint must not become an unhandled rejection");
+  assert.match(block, /clearInterval\(userCountTimer\)/, "a dead endpoint should stop being polled");
+  assert.match(block, /GraipLog/, "the failure must be recorded in the debug log");
+});

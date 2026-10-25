@@ -10,7 +10,7 @@
 <p>
   <a href="https://github.com/debug-cli/cherri-vercel/blob/main/LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-e2588d"></a>
   <img alt="No build step" src="https://img.shields.io/badge/build-none-brightgreen">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-104%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-106%20passing-brightgreen">
   <img alt="Proxy" src="https://img.shields.io/badge/proxy-Scramjet%20%2B%20Ultraviolet-blueviolet">
   <img alt="Transport" src="https://img.shields.io/badge/transport-libcurl.js%20%2B%20Wisp-informational">
 </p>
@@ -143,7 +143,7 @@ in the parts that decide whether it *works* when you need it:
 | **Offline / filtered network** | Blank page, no way into Settings | Cached app shell still boots |
 | **Deployment** | Sometimes needs a Node build, a server, or a specific host | Pure static files; deploys to Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, or `python3 -m http.server` |
 | **Mobile** | Desktop-only chrome | Purpose-built small-screen layout (bottom nav, stacked tabs, full-width frames) |
-| **Tests** | Usually none | `node --test tests/*.test.js`, 104 dependency-free tests covering the proxy, Wisp handling, panic, logging, sessions, settings backup, PWA shell and site wiring |
+| **Tests** | Usually none | `node --test tests/*.test.js`, 106 dependency-free tests covering the proxy, Wisp handling, panic, logging, sessions, settings backup, PWA shell and site wiring |
 
 What it is **not**: it is not a VPN, it does not host a proxy server, it does not bypass a network
 that blocks WebSockets entirely, and it cannot make a dead Wisp endpoint work.
@@ -314,7 +314,7 @@ There is no build step and no package manifest.
 
 ```sh
 python3 -m http.server 8080     # serve the repo root
-node --test tests/*.test.js     # 104 tests, no dependencies, no network
+node --test tests/*.test.js     # 106 tests, no dependencies, no network
 ```
 
 Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md).
@@ -363,7 +363,7 @@ original code was written by x8r. Changes made in this fork:
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader;
   shared scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`
 - Library hygiene: missing thumbnails get a placeholder and are reported
-- Added `tests/` (104 tests) and `AGENTS.md`
+- Added `tests/` (106 tests) and `AGENTS.md`
 
 Upstream: <https://github.com/x8rr/cherri>
 
