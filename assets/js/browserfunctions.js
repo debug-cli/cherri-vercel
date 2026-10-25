@@ -108,6 +108,19 @@ function waitForServiceWorkerControl() {
   });
 }
 
+/**
+ * Small logging shim. assets/js/log.js loads before this file on every page that
+ * includes it, but the browser helpers must also work when it does not (older
+ * cached pages, tests), so every call degrades to a no-op.
+ */
+const graipLog = {
+  d: (message, data) => window.GraipLog && window.GraipLog.debug("browser", message, data),
+  i: (message, data) => window.GraipLog && window.GraipLog.info("browser", message, data),
+  w: (message, data) => window.GraipLog && window.GraipLog.warn("browser", message, data),
+  e: (message, data) => window.GraipLog && window.GraipLog.error("browser", message, data),
+  a: (message, data) => window.GraipLog && window.GraipLog.action("browser", message, data),
+};
+
 /** Wisp endpoint the transport is currently connected to. */
 let wispUrl = null;
 let transportPromise = null;
@@ -263,18 +276,99 @@ function isUltravioletBackend() {
   );
 }
 
-function newTab() {
+/**
+ * Tab sessions are kept in sessionStorage so a reload, a crashed frame, or the
+ * service worker taking control does not throw away every open tab. The key is
+ * per page (the full browser and the mini browser keep separate sessions) and it
+ * is *session* storage: closing the browser window still forgets everything.
+ */
+const TAB_STORAGE_PREFIX = "graip_tabs:";
+
+function tabStorageKey() {
+  const path = (window.location && window.location.pathname) || "/pages/browser.html";
+  return TAB_STORAGE_PREFIX + path;
+}
+
+function saveTabSession() {
+  try {
+    const rows = bTabs.map((tab) => ({
+      id: tab.id,
+      title: tab.title || "New Tab",
+      url: tab.url || "",
+      history: Array.isArray(tab.history) ? tab.history.slice(-30) : [],
+      historyIndex: tab.historyIndex,
+    }));
+    sessionStorage.setItem(
+      tabStorageKey(),
+      JSON.stringify({ active: aTab, counter: tabCounter, tabs: rows })
+    );
+  } catch (error) {
+    graipLog.w("could not persist the tab session", error);
+  }
+}
+
+function readTabSession() {
+  try {
+    const raw = sessionStorage.getItem(tabStorageKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.tabs) || !parsed.tabs.length) return null;
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+}
+
+/** Forget the stored session (used by the panic key and by "clear traces"). */
+function clearTabSession() {
+  try {
+    sessionStorage.removeItem(tabStorageKey());
+  } catch (error) {
+    /* ignore */
+  }
+}
+
+/**
+ * Drop one tab from the tab strip and the frame list.
+ *
+ * @param {number} tabId
+ */
+function removeTabElements(tabId) {
+  const tEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
+  const frame = document.querySelector(`.viewframe[data-frame-id="${tabId}"]`);
+  if (tEl) tEl.remove();
+  if (frame) frame.remove();
+  scramjetFrames.delete(tabId);
+}
+
+function setTabTitle(tabId, title) {
+  const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
+  if (!tabEl) return;
+  const titleEl = tabEl.querySelector("span");
+  if (titleEl) titleEl.textContent = title;
+}
+
+/**
+ * Create one tab (state + strip entry + frame) and make it active.
+ *
+ * @param {{ url?: string, title?: string, history?: string[], historyIndex?: number, activate?: boolean }} [initial]
+ * @returns {object|null} the tab state
+ */
+function newTab(initial) {
   const tabCont = document.querySelector(".tabs");
+  const seed = initial || {};
   const nTab = {
     id: tabCounter++,
-    title: "New Tab",
-    url: "",
-    history: [],
-    historyIndex: -1,
+    title: seed.title || "New Tab",
+    url: seed.url || "",
+    history: Array.isArray(seed.history) ? seed.history.slice() : [],
+    historyIndex: Number.isInteger(seed.historyIndex) ? seed.historyIndex : -1,
+    // restored tabs only navigate when they are actually looked at
+    restoreUrl: seed.url || "",
   };
 
   bTabs.push(nTab);
-  if (!tabCont) return;
+  if (!tabCont) return nTab;
 
   const ntBtn = document.querySelector(".newtab");
 
@@ -288,6 +382,8 @@ function newTab() {
             </span>
         <i class="fas fa-times close-btn"></i>
         `;
+  const label = tabElement.querySelector("span");
+  if (label) label.textContent = nTab.title;
 
   tabElement.addEventListener("click", (e) => {
     if (!e.target.closest(".close-btn")) {
@@ -307,6 +403,8 @@ function newTab() {
   tabFrame.classList.add("viewframe", "browser-frame");
   tabFrame.dataset.frameId = nTab.id;
   tabFrame.setAttribute("allowfullscreen", "true");
+  // A proxied page must not learn where it is being embedded from.
+  tabFrame.setAttribute("referrerpolicy", "no-referrer");
 
   // Register the iframe with Scramjet instead of treating it as an unrelated
   // iframe. This gives Scramjet the frame metadata it needs for correct origin,
@@ -315,13 +413,57 @@ function newTab() {
   // for it anyway.
   scramjetFrameFor(nTab.id, tabFrame).catch((error) => {
     console.error("[graip] could not register the tab with Scramjet:", error);
+    graipLog.w("could not register a tab with Scramjet", error);
   });
 
   tabFrame.src = "/newtab.html";
 
   document.body.appendChild(tabFrame);
 
-  switchTab(nTab.id);
+  if (seed.activate !== false) switchTab(nTab.id);
+  graipLog.a("tab opened", { tabs: bTabs.length });
+  saveTabSession();
+  return nTab;
+}
+
+/**
+ * Rebuild the tabs from the previous session in this window. Falls back to a
+ * single blank tab when there is nothing to restore (or the data is unusable).
+ *
+ * @returns {number} how many tabs were restored
+ */
+function restoreTabSession() {
+  if (bTabs.length) return bTabs.length;
+
+  const saved = readTabSession();
+  if (!saved) {
+    newTab();
+    return bTabs.length;
+  }
+
+  let restored = 0;
+  for (const row of saved.tabs) {
+    if (!row || typeof row !== "object") continue;
+    const tab = newTab({
+      url: typeof row.url === "string" ? row.url : "",
+      title: typeof row.title === "string" ? row.title : "New Tab",
+      history: row.history,
+      historyIndex: row.historyIndex,
+      activate: false,
+    });
+    if (tab) restored++;
+  }
+
+  if (!restored) {
+    newTab();
+    return bTabs.length;
+  }
+
+  tabCounter = Math.max(tabCounter, Number(saved.counter) || tabCounter);
+  const active = bTabs.find((tab) => tab.id === saved.active);
+  switchTab(active ? active.id : bTabs[bTabs.length - 1].id);
+  graipLog.i("restored the tab session", { tabs: restored });
+  return restored;
 }
 
 function switchTab(tId) {
@@ -339,7 +481,20 @@ function switchTab(tId) {
   if (cTab) {
     const input = document.getElementById("searchbar");
     if (input) input.value = cTab.url;
+
+    // A restored tab is loaded the first time it is shown, so ten open tabs do
+    // not mean ten proxy navigations on startup.
+    if (cTab.restoreUrl) {
+      const pending = cTab.restoreUrl;
+      cTab.restoreUrl = "";
+      if (pending) {
+        graipLog.a("restored tab navigates", { url: pending });
+        go(pending, tId);
+      }
+    }
+    graipLog.a("tab switched", { tabId: tId });
   }
+  saveTabSession();
 }
 
 function closeTab(tId) {
@@ -351,14 +506,20 @@ function closeTab(tId) {
   const tIndex = bTabs.findIndex((t) => t.id === tId);
   if (tIndex === -1) return;
 
+  const closing = bTabs[tIndex];
+  // remember it for Ctrl+Shift+T (in-memory only: a reload forgets closed tabs)
+  if (closing && closing.url) {
+    closedTabs.push({
+      url: closing.url,
+      title: closing.title,
+      history: closing.history.slice(),
+      historyIndex: closing.historyIndex,
+    });
+    if (closedTabs.length > 10) closedTabs.shift();
+  }
+
   bTabs.splice(tIndex, 1);
-
-  const tEl = document.querySelector(`.tab[data-tab-id="${tId}"]`);
-  const frame = document.querySelector(`.viewframe[data-frame-id="${tId}"]`);
-
-  if (tEl) tEl.remove();
-  if (frame) frame.remove();
-  scramjetFrames.delete(tId);
+  removeTabElements(tId);
 
   if (aTab === tId) {
     const newATab = bTabs[Math.max(0, tIndex - 1)];
@@ -366,6 +527,9 @@ function closeTab(tId) {
       switchTab(newATab.id);
     }
   }
+
+  graipLog.a("tab closed", { tabs: bTabs.length });
+  saveTabSession();
 }
 
 function nav(i) {
@@ -388,8 +552,53 @@ function nav(i) {
   cTab.historyIndex++;
 
   cTab.url = url;
+  graipLog.a("navigate", { url });
 
   go(url);
+}
+
+/**
+ * Keep proxied URLs out of places that outlive the visit.
+ *
+ * Two things leak here:
+ *  - the top-level document's own URL, which the browser shows (and keeps in
+ *    history) when the user later navigates away;
+ *  - the tab strip, which is fine on screen but must not be remembered after a
+ *    panic.
+ *
+ * The address bar inside the app still shows the visited URL (that is the whole
+ * point of an omnibox), but the *document* URL is rewritten to a path-only value
+ * and anything stored is scrubbed by clearBrowserTraces().
+ */
+function scrubDocumentUrl() {
+  try {
+    const here = new URL(window.location.href);
+    if (!here.search) return;
+    // `launch` is the only parameter the page needs to boot with a browser UI;
+    // everything else (?url=, ?site=, ...) is dropped from history.
+    const keep = new URLSearchParams();
+    if (here.searchParams.get("launch")) keep.set("launch", "1");
+    const query = keep.toString();
+    window.history.replaceState({}, "", here.pathname + (query ? `?${query}` : "") + here.hash);
+  } catch (error) {
+    /* history API can be unavailable in odd embeddings */
+  }
+}
+
+/**
+ * Remove every trace this tab left behind: the tab session, the last URL and the
+ * partly-remembered address. Used before a panic navigation and by the explicit
+ * "Clear session traces" button in Settings.
+ */
+function clearBrowserTraces() {
+  if (typeof clearTabSession === "function") clearTabSession();
+  try {
+    localStorage.removeItem("graip_lastUrl");
+  } catch (error) {
+    /* ignore */
+  }
+  scrubDocumentUrl();
+  graipLog.i("browser traces cleared");
 }
 
 function updateUrlFromIframe(viewframe, tabId = aTab) {
@@ -421,6 +630,11 @@ function updateUrlFromIframe(viewframe, tabId = aTab) {
 
     if (decodedUrl && decodedUrl !== cTab.url) {
       cTab.url = decodedUrl;
+      cTab.title = viewframe.contentDocument && viewframe.contentDocument.title
+        ? viewframe.contentDocument.title
+        : cTab.title;
+      graipLog.d("url changed", { url: decodedUrl });
+      saveTabSession();
 
       const ubar = document.getElementById("searchbar");
       if (ubar && tabId === aTab) ubar.value = decodedUrl;
@@ -453,6 +667,7 @@ async function go(target, tabId = aTab) {
   }
 
   if (!cTab) return;
+  graipLog.a("loading url", { url: cTab.url, tabId });
   if (ubar && tabId === aTab) ubar.value = cTab.url;
   if (favEl) {
     const faviconDomain = new URL(cTab.url).hostname;
@@ -497,11 +712,9 @@ async function go(target, tabId = aTab) {
 
         const title = iframeDoc.title || new URL(cTab.url).hostname;
 
-        const tabEl = document.querySelector(`.tab[data-tab-id="${tabId}"]`);
-        if (tabEl) {
-          const titleEl = tabEl.querySelector("span");
-          if (titleEl) titleEl.textContent = title;
-        }
+        cTab.title = title;
+        setTabTitle(tabId, title);
+        saveTabSession();
 
         updateUrlFromIframe(viewframe, tabId);
       } catch (e) {
@@ -689,6 +902,166 @@ async function retryProxyRoute(target, viewframe, attempts, maxAttempts, tabId) 
   return recoveryPromise;
 }
 
+/**
+ * Omnibox keyboard shortcuts for the browser pages.
+ *
+ * Ctrl+L focuses the address bar with its contents selected, Ctrl+T opens a tab,
+ * Ctrl+W closes the current one, Ctrl+Shift+T reopens the last closed one and
+ * Alt+Left/Right walks the tab history. Shortcuts only fire inside the browser
+ * pages, and never while typing in a text field (except the ones that are meant
+ * to work there, like Ctrl+L).
+ */
+const closedTabs = [];
+let omniboxInstalled = false;
+
+function installOmnibox() {
+  if (omniboxInstalled) return;
+  omniboxInstalled = true;
+
+  window.addEventListener(
+    "keydown",
+    (event) => {
+      const key = (event.key || "").toLowerCase();
+      const mod = event.ctrlKey || event.metaKey;
+      const target = event.target;
+      const tag = (target && target.tagName) || "";
+      const typing =
+        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+        (target && target.isContentEditable);
+
+      if (mod && key === "l") {
+        event.preventDefault();
+        const input = document.getElementById("searchbar");
+        if (input) {
+          input.focus();
+          input.select();
+          graipLog.a("omnibox focused");
+        }
+        return;
+      }
+
+      if (mod && key === "t") {
+        if (typing) return;
+        event.preventDefault();
+        if (event.shiftKey) {
+          const last = closedTabs.pop();
+          if (!last) return;
+          const tab = newTab({ url: last.url, title: last.title, history: last.history, historyIndex: last.historyIndex });
+          if (tab) tab.restoreUrl = last.url || "";
+          graipLog.a("reopened closed tab");
+          return;
+        }
+        newTab();
+        const input = document.getElementById("searchbar");
+        if (input) input.focus();
+        return;
+      }
+
+      if (mod && key === "w") {
+        if (typing) return;
+        event.preventDefault();
+        closeTab(aTab);
+        return;
+      }
+
+      if (event.altKey && (key === "arrowleft" || key === "arrowright")) {
+        if (typing) return;
+        event.preventDefault();
+        if (key === "arrowleft") b();
+        else f();
+      }
+    },
+    true
+  );
+
+  graipLog.d("omnibox shortcuts installed");
+}
+
+/**
+ * Turn address-bar input into a navigation, including search bangs:
+ * `!g cats`, `!yt lofi`, `!w entropy`, `!ddg ...`. Anything else is treated as a
+ * URL, exactly like nav() does.
+ *
+ * @param {string} raw
+ * @returns {string} the URL that nav() should load
+ */
+function resolveOmniboxInput(raw) {
+  const input = (raw || "").trim();
+  const bangs = {
+    "!g": "https://google.com/search?q=",
+    "!ddg": "https://duckduckgo.com/?q=",
+    "!b": "https://bing.com/search?q=",
+    "!yt": "https://www.youtube.com/results?search_query=",
+    "!w": "https://en.wikipedia.org/w/index.php?search=",
+    "!gh": "https://github.com/search?q=",
+    "!r": "https://www.reddit.com/search/?q=",
+  };
+
+  const match = input.match(/^(![a-z]+)\s+(.+)$/i);
+  if (match) {
+    const engine = bangs[match[1].toLowerCase()];
+    if (engine) {
+      graipLog.a("omnibox bang", { bang: match[1].toLowerCase() });
+      return engine + encodeURIComponent(match[2]);
+    }
+  }
+
+  const configured = localStorage.getItem("graip_searchEngine") || "Google";
+  const searchUrls = {
+    Google: "https://google.com/search?q=",
+    DuckDuckGo: "https://duckduckgo.com/?q=",
+    Bing: "https://bing.com/search?q=",
+    Startpage: "https://www.startpage.com/sp/search?query=",
+    Qwant: "https://www.qwant.com/?q=",
+    Brave: "https://search.brave.com/search?q=",
+  };
+
+  const looksLikeUrl =
+    !input.includes(" ") &&
+    (/^[a-z][a-z0-9+.-]*:\/\//i.test(input) ||
+      /^[^\s/]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(input) ||
+      input.startsWith("localhost"));
+
+  if (looksLikeUrl) {
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(input) ? input : "https://" + input;
+  }
+
+  return (searchUrls[configured] || searchUrls.Google) + encodeURIComponent(input);
+}
+
+/**
+ * Wire the address bar: Enter navigates, and the empty state searches.
+ * Existing pages already bind Enter to their own handler, so this only adds the
+ * bang handling there is no equivalent of.
+ */
+function installOmniboxInput() {
+  const input = document.getElementById("searchbar");
+  if (!input || input.dataset.graipOmnibox === "1") return;
+  input.dataset.graipOmnibox = "1";
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const value = input.value.trim();
+    if (!value) return;
+    if (!/^(![a-z]+\s)/i.test(value) && !value.startsWith("!")) {
+      // no bang: leave the page's own handler in charge
+      return;
+    }
+    event.stopPropagation();
+    event.preventDefault();
+    const target = resolveOmniboxInput(value);
+    const cTab = bTabs.find((t) => t.id === aTab);
+    if (cTab) {
+      cTab.history.push(target);
+      cTab.historyIndex++;
+      cTab.url = target;
+    }
+    go(target);
+  }, true);
+
+  graipLog.d("omnibox input installed");
+}
+
 function b() {
   const cTab = bTabs.find((t) => t.id === aTab);
   if (!cTab || cTab.historyIndex <= 0) return;
@@ -792,3 +1165,35 @@ async function fixProxy() {
     "color: white; font-weight: normal;"
   );
 }
+
+/**
+ * Boot the browser chrome once the DOM exists: restore the session, install the
+ * shortcuts and the address bar hooks, and make the panic key available.
+ *
+ * Pages still call newTab()/restoreTabSession() themselves; this only adds the
+ * behaviours that do not belong in their inline scripts.
+ */
+window.addEventListener("DOMContentLoaded", () => {
+  installOmnibox();
+  installOmniboxInput();
+  scrubDocumentUrl();
+
+  if (window.GraipCloak) {
+    window.GraipCloak.installPanicKey();
+    // A panic replaces this document, so make sure the tab session does not
+    // survive it in sessionStorage.
+    if (sessionStorage.getItem("graip_panicReturn") === "1") {
+      sessionStorage.removeItem("graip_panicReturn");
+      clearBrowserTraces();
+      graipLog.i("panic return: tabs were forgotten on purpose");
+    }
+  }
+
+  if (window.GraipLog) window.GraipLog.configureServiceWorker();
+  graipLog.d("browser helpers ready", { tabs: bTabs.length });
+});
+
+// keep the stored session current when the page goes away
+window.addEventListener("pagehide", () => {
+  if (typeof saveTabSession === "function" && bTabs.length) saveTabSession();
+});

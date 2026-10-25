@@ -12,6 +12,211 @@ if (navigator.userAgent.includes("Firefox")) {
 // proxy related is kept in here.
 importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js");
 
+/**
+ * Take control immediately.
+ *
+ * Without skipWaiting() a new worker waits for every tab to close before it can
+ * activate, so a fix to this file (or to the ad blocklist) silently did nothing
+ * until the user restarted the browser. clients.claim() then makes the new
+ * worker the controller of already-open pages, which is what
+ * waitForServiceWorkerControl() in browserfunctions.js waits for -- previously
+ * that promise only resolved on `controllerchange`, i.e. after a manual reload.
+ */
+self.addEventListener("install", () => {
+	self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+	event.waitUntil(self.clients.claim());
+});
+
+/**
+ * Offline shell.
+ *
+ * The site is a single-page-ish shell plus a lot of static assets; without a
+ * cache a filtered network leaves a blank page with no way to reach Settings ->
+ * Proxy. Only first-party, same-origin GETs are cached -- proxied traffic
+ * (/~/sj/, /uv/service/) and cross-origin requests are never stored, so a cached
+ * page can never leak a visited site back into a later session.
+ *
+ * Bump SHELL_VERSION when the list or the shell's behaviour changes; activate
+ * deletes every cache that does not match.
+ */
+const SHELL_CACHE = "graip-shell-v1";
+const SHELL_ASSETS = [
+	"/index.html",
+	"/newtab.html",
+	"/404.html",
+	"/panic.html",
+	"/manifest.json",
+	"/styles/index.css",
+	"/assets/css/colors.css",
+	"/assets/css/dropdown.css",
+	"/assets/css/t.css",
+	"/assets/css/elements.css",
+	"/assets/css/font.css",
+	"/assets/css/mobile.css",
+	"/assets/css/themes/midnight.css",
+	"/assets/js/log.js",
+	"/assets/js/cloak.js",
+	"/assets/js/colors.js",
+	"/assets/js/t.js",
+	"/assets/js/cursor.js",
+	"/assets/js/wisp.js",
+	"/assets/js/dropdown.js",
+	"/assets/js/proxy-errors.js",
+	"/assets/js/browserfunctions.js",
+	"/assets/js/debug-panel.js",
+	"/assets/js/splash.js",
+	"/assets/json/partners.json",
+	"/assets/json/config/particles.json",
+	"/assets/img/fav.png",
+];
+
+/** URLs the shell strategy must never touch. */
+function isProxyPath(url) {
+	return url.pathname.startsWith("/~/sj/") || url.pathname.startsWith("/uv/service/");
+}
+
+self.addEventListener("install", (event) => {
+	event.waitUntil(
+		caches.open(SHELL_CACHE).then(async (cache) => {
+			// One failing asset must not fail the whole install (a deployment may
+			// not ship every theme, for example).
+			await Promise.all(
+				SHELL_ASSETS.map((asset) =>
+					cache.add(new Request(asset, { cache: "reload" })).catch(() => null)
+				)
+			);
+		})
+	);
+});
+
+self.addEventListener("activate", (event) => {
+	event.waitUntil(
+		(async () => {
+			const names = await caches.keys();
+			await Promise.all(
+				names
+					.filter((name) => name.startsWith("graip-shell-") && name !== SHELL_CACHE)
+					.map((name) => caches.delete(name))
+			);
+			await self.clients.claim();
+		})()
+	);
+});
+
+/**
+ * Network first, cache second. A deploy is picked up immediately when online,
+ * and an offline visit still gets the shell instead of a browser error page.
+ *
+ * @param {FetchEvent} event
+ * @returns {Promise<Response>}
+ */
+async function shellRequest(event) {
+	const request = event.request;
+
+	try {
+		const response = await fetch(request);
+		if (response && response.ok) {
+			const copy = response.clone();
+			caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy)).catch(() => null);
+		}
+		return response;
+	} catch (error) {
+		const cached = await caches.match(request, { ignoreSearch: true });
+		if (cached) {
+			sendLog({
+				level: "warn",
+				category: "shell",
+				message: "network failed, served from the offline cache",
+				data: { url: describeRequest(request) },
+			});
+			return cached;
+		}
+
+		// A navigation with nothing cached still needs *something* usable.
+		if (request.mode === "navigate") {
+			const shell = await caches.match("/index.html", { ignoreSearch: true });
+			if (shell) return shell;
+		}
+
+		throw error;
+	}
+}
+
+/**
+ * Proxied-request reporting.
+ *
+ * The page asks for this with a `$graip$logConfig` message (see assets/js/log.js);
+ * until then the worker stays quiet. Reports are batched so a page loading 60
+ * subresources produces one message instead of 60.
+ */
+const LOG_STATE = {
+	enabled: false,
+	queue: [],
+	flushTimer: null,
+};
+
+const LOG_BATCH = 25;
+const LOG_FLUSH_MS = 400;
+const SUBRESOURCE_NOISE = /\.(png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|eot|otf|mp4|webm|mp3|m4s|ts)(\?|$)/i;
+
+function sendLog(entry) {
+	if (!LOG_STATE.enabled) return;
+	LOG_STATE.queue.push(entry);
+
+	// Subresources are only interesting when they fail, so they never force a
+	// flush on their own.
+	const urgent = entry.level === "warn" || entry.level === "error";
+	if (LOG_STATE.queue.length >= LOG_BATCH || (urgent && !LOG_STATE.flushTimer)) {
+		flushLog();
+		return;
+	}
+	if (!LOG_STATE.flushTimer) {
+		LOG_STATE.flushTimer = setTimeout(flushLog, LOG_FLUSH_MS);
+	}
+}
+
+function flushLog() {
+	clearTimeout(LOG_STATE.flushTimer);
+	LOG_STATE.flushTimer = null;
+	if (!LOG_STATE.queue.length) return;
+
+	const entries = LOG_STATE.queue.splice(0, LOG_STATE.queue.length);
+	self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((clients) => {
+		for (const client of clients) {
+			for (const entry of entries) {
+				client.postMessage({ $graip$log: entry });
+			}
+		}
+	}).catch(() => {
+		/* no clients left */
+	});
+}
+
+function describeRequest(request) {
+	// host + path only: the log is meant to be shareable
+	try {
+		const url = new URL(request.url);
+		return url.origin + url.pathname;
+	} catch (error) {
+		return "(unparseable url)";
+	}
+}
+
+self.addEventListener("message", (event) => {
+	const config = event.data && event.data.$graip$logConfig;
+	if (!config || typeof config !== "object") return;
+
+	LOG_STATE.enabled = Boolean(config.verbose);
+	sendLog({
+		level: "info",
+		category: "sw",
+		message: `service worker logging ${LOG_STATE.enabled ? "enabled" : "disabled"}`,
+	});
+});
+
 const CONFIG = {
 	blocked: [
 		"youtube.com/get_video_info?*adformat=*",
@@ -334,9 +539,20 @@ async function findTransportError(response) {
  * @returns {Promise<Response>}
  */
 async function handleRequest(event) {
-	const blocked = blockedTarget(event.request.url);
+	const request = event.request;
+	const isNavigation = request.mode === "navigate";
+	const isSubresource = SUBRESOURCE_NOISE.test(request.url);
+	const started = Date.now();
+
+	const blocked = blockedTarget(request.url);
 
 	if (blocked) {
+		sendLog({
+			level: "warn",
+			category: "proxy",
+			message: "requests to this host are blocked by the ad filter",
+			data: { url: describeRequest(request) },
+		});
 		return new Response("Site Blocked", {
 			status: 403,
 			headers: { "content-type": "text/plain; charset=utf-8" },
@@ -344,7 +560,7 @@ async function handleRequest(event) {
 	}
 
 	if (!$scramjetController.shouldRoute(event)) {
-		return fetch(event.request);
+		return fetch(request);
 	}
 
 	let response;
@@ -353,24 +569,81 @@ async function handleRequest(event) {
 		response = await $scramjetController.route(event);
 	} catch (error) {
 		console.error("[graip] proxy fetch failed:", error);
+		sendLog({
+			level: "error",
+			category: "proxy",
+			message: "proxied request failed",
+			data: {
+				url: describeRequest(request),
+				kind: GraipProxyErrors.classify(error).kind,
+				error: (error && error.message) || String(error),
+				ms: Date.now() - started,
+			},
+		});
 		return transportErrorPage(event, error);
 	}
 
 	const renderedTransportError = await findTransportError(response);
 	if (renderedTransportError) {
 		console.error("[graip] proxy destination request failed:", renderedTransportError);
+		sendLog({
+			level: "error",
+			category: "proxy",
+			message: "destination request failed",
+			data: {
+				url: describeRequest(request),
+				kind: GraipProxyErrors.classify(renderedTransportError).kind,
+				error: renderedTransportError,
+				ms: Date.now() - started,
+			},
+		});
 		return transportErrorPage(event, new Error(renderedTransportError));
+	}
+
+	// Successful proxied requests: navigations and documents always, static
+	// subresources only when they fail, so the log stays readable.
+	if (isNavigation || (!isSubresource && LOG_STATE.enabled)) {
+		sendLog({
+			level: response.status >= 500 ? "warn" : "debug",
+			category: "proxy",
+			message: isNavigation ? "page loaded through the proxy" : "request proxied",
+			data: {
+				url: describeRequest(request),
+				status: response.status,
+				ms: Date.now() - started,
+			},
+		});
 	}
 
 	return response;
 }
 
 self.addEventListener("fetch", (event) => {
-	const url = event.request.url;
+	const request = event.request;
+	const url = request.url;
 
-  	if (url.includes("supabase.co")) {
-    	return;
-  	}
+	if (url.includes("supabase.co")) {
+		return;
+	}
+
+	if (request.method && request.method !== "GET") return;
+
+	let parsed;
+	try {
+		parsed = new URL(url);
+	} catch (error) {
+		return;
+	}
+
+	// Only this origin, and never the proxy's own traffic. `self.location` is
+	// always present in a real worker; the guard keeps the worker testable.
+	const origin = (self.location && self.location.origin) || parsed.origin;
+	if (parsed.origin === origin && !isProxyPath(parsed)) {
+		// Range requests (video seeking) must not be answered from the cache.
+		if (request.headers.get("range")) return;
+		event.respondWith(shellRequest(event));
+		return;
+	}
 
 	event.respondWith(handleRequest(event));
 });

@@ -38,6 +38,14 @@
     <script src="/homework/english.bundle.js"></script>
     <script src="/assets/js/proxy-errors.js"></script>
     <script src="/assets/js/browserfunctions.js"></script>
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
+    <link rel="stylesheet" href="/assets/css/mobile.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="graip">
 </head>
 
 <body>
@@ -304,9 +312,13 @@
     </script>
     <script defer>
         const initialUrl = new URLSearchParams(window.location.search).get("launch")
-        newTab()
         if (initialUrl) {
+            // an explicit launch always starts a fresh tab
+            newTab()
             nav(initialUrl)
+        } else {
+            // no launch target: come back to the tabs that were open last time
+            restoreTabSession()
         }
     </script>
     <div id="cursor-thank-you-zxs"

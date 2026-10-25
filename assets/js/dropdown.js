@@ -32,56 +32,20 @@ const storeSelector = document.querySelector(".store-selector");
 const storeSelected = storeSelector.querySelector(".store-selected");
 const storeOptions = storeSelector.querySelector(".store-options");
 
-const decoyPresets = {
-  Google: {
-    title: "Google",
-    icon: "https://www.google.com/favicon.ico",
-  },
-  "Google Docs": {
-    title: "Untitled document - Google Docs",
-    icon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon-2023q4.ico",
-  },
-  Youtube: {
-    title: "YouTube",
-    icon: "https://www.youtube.com/s/desktop/014dbbed/img/favicon_32x32.png",
-  },
-  "Google Drive": {
-    title: "My Drive - Google Drive",
-    icon: "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png",
-  },
-  "Khan Acadamy": {
-    title: "Khan Academy | Free Online Courses",
-    icon: "https://www.khanacademy.org/favicon.ico",
-  },
-  Canvas: {
-    title: "Dashboard | Canvas",
-    icon: "https://community.canvaslms.com/favicon.ico",
-  },
-  "Google Classroom": {
-    title: "Classroom",
-    icon: "https://ssl.gstatic.com/classroom/favicon.png",
-  },
-  "Delta Math": {
-    title: "Delta Math - Assignment",
-    icon: "https://www.google.com/s2/favicons?domain=deltamath.com&sz=256",
-  },
-  Microsoft: {
-    title: "Microsoft 365",
-    icon: "https://www.microsoft.com/favicon.ico",
-  },
-  Scratch: {
-    title: "Scratch - Imagine, Program, Share",
-    icon: "https://scratch.mit.edu/favicon.ico",
-  },
-  Billibilli: {
-    title: "Bilibili - Video Sharing Platform",
-    icon: "https://www.bilibili.com/favicon.ico",
-  },
-  Schoology: {
-    title: "Home | Schoology",
-    icon: "https://asset-cdn.schoology.com/sites/all/themes/schoology_theme/favicon.ico",
-  },
-};
+/**
+ * The disguise list lives in assets/js/cloak.js: it pairs a profile with the page
+ * that is rendered inside an about:blank window, and the panic page uses the same
+ * profiles. This file only renders it.
+ */
+const decoyProfiles =
+  typeof GraipCloak !== "undefined" && GraipCloak.PROFILES
+    ? GraipCloak.PROFILES
+    : { None: { title: "graip", icon: "/assets/img/fav.png", page: "none" } };
+
+const decoyPresets = {};
+for (const [name, preset] of Object.entries(decoyProfiles)) {
+  decoyPresets[name] = { title: preset.title, icon: preset.icon };
+}
 
 
 function closeAllSelectors() {
@@ -132,20 +96,7 @@ const allSearchEngineOptions = [
   "Bing",
   "Startpage",
 ];
-const allDecoyOptions = [
-  "None",
-  "Google",
-  "Google Docs",
-  "Youtube",
-  "Google Drive",
-  "Khan Acadamy",
-  "Canvas",
-  "Google Classroom",
-  "Delta Math",
-  "Microsoft",
-  "Scratch",
-  "Billibilli",
-];
+const allDecoyOptions = Object.keys(decoyPresets);
 
 const wispPresets = GraipWisp.PRESETS;
 // Every known endpoint is selectable. The old build exposed a hardcoded
@@ -361,6 +312,9 @@ function createSelector(
                 })
               );
             if (successMsg) showToast("success", successMsg, "check-circle");
+            if (window.GraipLog) {
+              window.GraipLog.action("settings", `${selectorType} set to ${storageVal}`);
+            }
 
             if (storageKey === "cloakLink") {
               runMenuCloak();
@@ -375,28 +329,29 @@ function createSelector(
   });
 }
 
+/**
+ * Apply the chosen disguise. cloak.js owns the profiles and the storage keys, so
+ * this is a delegate (and still works if cloak.js is missing).
+ *
+ * @param {string} s profile name
+ */
 function applyDecoy(s) {
+  if (typeof GraipCloak !== "undefined" && GraipCloak.applyCloak) {
+    GraipCloak.applyCloak(s);
+    return;
+  }
+
   const selected = decoyPresets[s];
-  let favicon = document.querySelector("link[rel*='icon']");
+  const favicon = document.querySelector("link[rel*='icon']");
 
   if (s === "None" || !selected) {
-    console.log(
-      "Stayed as " +
-        favicon.href +
-        " " +
-        document.title +
-        " and " +
-        s +
-        " was selected"
-    );
     document.title = "graip";
-    favicon.href = "/assets/img/fav.png";
+    if (favicon) favicon.href = "/assets/img/fav.png";
     return;
-  } else {
-    document.title = selected.title;
-    favicon.href = selected.icon;
-    console.log("Set to " + favicon.href + " " + document.title);
   }
+
+  document.title = selected.title;
+  if (favicon) favicon.href = selected.icon;
 }
 
 createSelector(
@@ -470,6 +425,5 @@ document.addEventListener("wispUpdated", (e) => {
 });
 document.addEventListener("graipWispServerChanged", updateWispSelector);
 window.addEventListener("load", () => {
-  applyDecoy(localStorage.getItem("decoy"));
-  console.log("Cloaked as " + localStorage.getItem("decoy"));
+  applyDecoy(localStorage.getItem("decoy") || "None");
 });

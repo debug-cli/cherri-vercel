@@ -72,6 +72,14 @@ function createHarness() {
       var setTabError = (message, tabId) => calls.push({ kind: "error", message, tabId });
       var recoveryAttempts = new Map();
       var GraipWisp = { describeError: String };
+      // browserfunctions.js defines these; the harness only exercises go()
+      var graipLog = { d() {}, i() {}, w() {}, e() {}, a() {} };
+      var setTabTitle = (tabId, title) => {
+        var el = document.querySelector('.tab[data-tab-id="' + tabId + '"]');
+        var span = el && el.querySelector("span");
+        if (span) span.textContent = title;
+      };
+      var saveTabSession = () => {};
       var updateUrlFromIframe = (frame, tabId) => calls.push({ kind: "url-update", tabId });
       ${goSource}
       globalThis.testGo = go;

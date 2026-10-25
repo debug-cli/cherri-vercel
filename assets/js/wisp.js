@@ -408,7 +408,18 @@
         } catch (error) {
           /* ignore */
         }
-        resolve(Object.assign({ url, ms: Date.now() - started }, result));
+        const outcome = Object.assign({ url, ms: Date.now() - started }, result);
+        if (outcome.ok) {
+          logEvent("debug", "wisp handshake ok", { url, ms: outcome.ms });
+        } else {
+          logEvent("warn", "wisp probe failed", {
+            url,
+            reason: outcome.reason,
+            detail: outcome.detail,
+            ms: outcome.ms,
+          });
+        }
+        resolve(outcome);
       };
 
       const timer = setTimeout(() => {
@@ -501,6 +512,16 @@
   const state = { verified: null, inflight: null };
 
   /**
+   * Report probe results to the debug log. Wisp trouble is the single most
+   * common cause of "the proxy is broken", so every probe outcome is recorded.
+   */
+  function logEvent(level, message, data) {
+    const logger = global.GraipLog;
+    if (!logger || typeof logger[level] !== "function") return;
+    logger[level]("wisp", message, data);
+  }
+
+  /**
    * Remember a server the user picked by hand (settings page).
    *
    * @param {string} url
@@ -532,6 +553,7 @@
 
     // a hand picked server has not been proven yet
     state.verified = null;
+    logEvent("info", "wisp server chosen in settings", { url: normalized, custom: !!(options && options.custom) });
     return normalized;
   }
 
@@ -598,6 +620,12 @@
         write(KEYS.active, result.url);
         write(KEYS.verifiedAt, String(Date.now()));
 
+        logEvent("info", "wisp server selected", {
+          url: result.url,
+          preferred,
+          fallback: result.url !== preferred,
+        });
+
         // Remember *why* traffic moved, without touching the saved preference.
         if (result.url === preferred) {
           write(KEYS.fallback, "");
@@ -617,6 +645,10 @@
         }
       } else {
         state.verified = null;
+        logEvent("error", "no wisp server answered", {
+          preferred,
+          tried: candidateList({ exclude: [...excluded] }).length,
+        });
       }
 
       return result;

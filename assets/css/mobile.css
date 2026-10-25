@@ -1,0 +1,142 @@
+/* ---------------------------------------------------------------------------
+   Small-screen layout for the browsing pages.
+
+   Loaded by browser.html, browser-minimum.html, embed.html, play.html, vms.html
+   and assistant.html. Every rule lives inside a media query and uses a
+   `html body` prefix so it can override the per-page inline <style> blocks
+   without changing anything above 640px.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+
+    /* --- browser chrome ------------------------------------------------- */
+    html body .browser-controls {
+        padding: 8px 8px 6px;
+    }
+
+    html body .tabs {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+        margin-bottom: 6px;
+        padding-bottom: 2px;
+    }
+
+    html body .tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    html body .tab {
+        max-width: 44vw;
+        min-width: 64px;
+        padding: 8px 10px;
+        font-size: 13px;
+        flex: 0 0 auto;
+    }
+
+    html body .tab img {
+        width: 16px;
+        height: 16px;
+    }
+
+    html body .newtab {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+    }
+
+    /* the search row is absolutely positioned on desktop: let it flow instead */
+    html body .browser-buttons .hcontainer {
+        position: static;
+        transform: none;
+        margin-top: 0;
+        width: 100%;
+        gap: 4px;
+        align-items: center;
+    }
+
+    html body .browser-buttons button {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        font-size: 14px;
+        border-radius: 9px;
+    }
+
+    html body .browser-buttons .ri {
+        font-size: 16px;
+    }
+
+    html body .browser-buttons input {
+        height: 34px;
+        padding: 0 10px;
+        font-size: 13px;
+        min-width: 0;
+    }
+
+    /* the frames start below the (now two-line) toolbar */
+    html body .browser-frame {
+        top: 104px;
+        height: calc(100vh - 108px);
+        width: 100%;
+        left: 0;
+        transform: none;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    html body .nav-logo {
+        display: none;
+    }
+
+    html body .browser-container {
+        height: 100vh;
+    }
+
+    /* --- game page ------------------------------------------------------ */
+    html body #gameframe {
+        width: 100vw;
+        height: calc(100vh - 70px);
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    html body .gamecontrols {
+        width: 100vw;
+        height: 52px;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    html body .gamestuff {
+        width: 100%;
+        display: flex;
+    }
+
+    html body .gamestuff button {
+        width: auto;
+        flex: 1 1 0;
+        font-size: 21px;
+        height: 52px;
+    }
+
+    html body #bottom-tip {
+        display: none;
+    }
+
+    /* --- floating widgets ----------------------------------------------- */
+    html body .proxy-widget {
+        width: 100%;
+        height: 60vh;
+        right: 0;
+        bottom: 0;
+        border-radius: 14px 14px 0 0;
+    }
+
+    html body #particles-container {
+        display: none;
+    }
+}

@@ -31,6 +31,9 @@ deployment happens to put one there.
 | `pages/*.html` | Everything `navTo()` loads into `#contentFrame`: `browser`, `browser-minimum`, `embed`, `play`, `movies`, `watch`, `movieframe`, `apps`, `games`, `partners`, `assistant`, `vms`, `chatrooms`, `gmbl`. No `settings.html` — settings live in `index.html`. |
 | `newtab.html`, `404.html`, `start.html` | `newtab` is the new-tab page; `404` is the host's not-found page; `start.html` is the Classroom disguise and is excluded from link/nav tests. |
 | `assets/js/` | First-party scripts (see below). `assets/js/lib/` is third-party. |
+| `panic.html` | The panic decoy: black screen until the target has loaded, then a decoy page. Self-contained (no CSS/CDN/proxy) so it works on a filtered network. |
+| `manifest.json` | PWA manifest (standalone, `/?launch=1` start URL, SVG icon). |
+| `vercel.json` | Cache/header rules only; there is no build. |
 | `assets/json/` | Game/app lists (`classplay.json`, `gn-math.json`, `apps.json`, `config/particles.json`). |
 | `assets/css/`, `styles/` | Theme variables (`colors.css` + `assets/css/themes/*.css`) and layout. |
 | `sw.js` | Scramjet's service worker: `importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js")`, plus an ad blocklist and the proxy error page. |
@@ -50,6 +53,9 @@ deployment happens to put one there.
 | `assets/js/settings.js` | Legacy settings helpers. Also included by ~96 pages inside `stores/`, which have no settings UI at all — every lookup in it must stay optional. |
 | `assets/js/colors.js` | Applies the saved theme to `#css-theme-link` on first paint. |
 | `assets/js/vm.js` | Legacy Hyperbeam VM launcher; the markup it needs exists on no current page, so it must no-op. |
+| `assets/js/log.js` | `window.GraipLog`: the exportable debug log. Installs global capture (errors, rejections, `console.error/warn`, `fetch`, SW reports) and owns `graip_debugLog`, `graip_verboseLogs`. **Loads first on every page.** |
+| `assets/js/cloak.js` | `window.GraipCloak`: disguise profiles, panic key, `about:blank` window, decoy documents. Owns the `decoy`, `graip_cloak*`, `graip_panic*` keys. Loads on every page and re-applies the disguise on load. |
+| `assets/js/debug-panel.js` | Settings wiring for the Debug + Panic controls. Mounts toggles into `.graip-toggle-slot` placeholders by cloning an existing `.switch`, so new switches cannot drift visually. |
 | `assets/js/t.js` / `splash.js` / `cursor.js` | Toasts, homepage splash text, custom cursor. |
 
 Conventions:
@@ -126,9 +132,67 @@ Rules that must not regress:
   that a different Wisp host will help; route retries exist to diagnose, and TLS
   verification must stay on.
 
+## Debug log
+
+`GraipLog` is the single recorder. Nothing calls `console.log` for diagnostics anymore; a feature logs
+through `GraipLog.debug/info/warn/error(category, message, data)` and, for user actions,
+`GraipLog.action(...)`.
+
+- Two streams: **verbose on** (default) records everything; **verbose off** still records
+  `warn`/`error`. `setVerbose()` persists to `graip_verboseLogs` and re-posts the config to the
+  service worker.
+- Bounded: 1000 entries in memory, the last 400 mirrored into `graip_debugLog` (debounced write) so a
+  crash still leaves evidence. `clear()` keeps exactly one entry: "log cleared".
+- Privacy: `safeUrl()` strips the query string and fragment from every URL before it is stored, and
+  values are truncated. **Never log a full URL, a token, or page content.**
+- `sw.js` reports through `postMessage({ $graip$log: … })`, batched (25 entries / 400 ms), and only
+  after the page sends `$graip$logConfig`. Navigations are always reported; static subresources only
+  on failure.
+- Export: `exportJSON()`, `exportText()`, `download("json"|"txt")`, `copy()` — wired to Settings →
+  Debug.
+
+Adding a log line to a new feature is expected, not optional: "capture every action" is the point of
+the panel.
+
+## Panic and cloaking
+
+- `panic.html` is the only page that must render **nothing** of graip. It loads log.js and cloak.js
+  (for `safeUrl` and `blankDocument`) but sets `data-graip-no-auto-cloak="1"` on `<html>` so
+  cloak.js does not overwrite its decoy title.
+- The blackout is a `#blackout` overlay that is only removed once the target frame fires `load`
+  (+ two RAFs for same-origin targets, + a timeout as the last resort). Never reveal the frame
+  earlier: the whole feature exists so that the proxy is never visible while the decoy loads.
+- `GraipCloak.PROFILES` is the single list of disguises (title + icon + decoy page kind).
+  `dropdown.js` renders it, `panic.html` uses it, `about:blank` uses it. Add a profile there only.
+- Panic defaults: **off**, key `\`, destination Google Classroom, same-tab, decoy page on. A panic
+  writes `sessionStorage.graip_panicReturn` so `browserfunctions.js` can wipe the tab session on the
+  way back, and `clearBrowserTraces()` scrubs the address bar.
+- Letter keys (`z`, `q`) must not fire while typing or with modifiers; `matches()` enforces this.
+
+## Tabs and the omnibox
+
+- Tab state lives in `bTabs`; the session is mirrored to `sessionStorage["graip_tabs:<pathname>"]`
+  (`saveTabSession()` on every mutation + `pagehide`). Restored tabs are **lazy**: the URL is kept in
+  `tab.restoreUrl` and only navigated when the tab is first shown.
+- `pages/browser.html` and `pages/browser-minimum.html` call `restoreTabSession()` (falls back to one
+  new tab); an explicit `?launch=` always starts fresh.
+- Omnibox: `installOmnibox()` (shortcuts) + `installOmniboxInput()` (bangs) run on DOMContentLoaded in
+  `browserfunctions.js`. `resolveOmniboxInput()` is pure and unit-tested — extend the bang table there.
+- `clearBrowserTraces()` / "Clear session traces" forgets the tab session and the URL. Do not store
+  visited URLs anywhere else.
+
+## Small-screen and offline
+
+- `assets/css/mobile.css` and the mobile section at the end of `styles/index.css` are **media-query
+  only**. `tests/mobile-pwa.test.js` fails if a top-level rule appears there, so the desktop layout
+  cannot regress by accident.
+- `sw.js` caches only same-origin GETs outside `/~/sj/` and `/uv/service/` (`SHELL_ASSETS`,
+  `graip-shell-v1`). Navigations are network-first with a cache fallback. Never cache proxied or
+  cross-origin responses; bump `SHELL_CACHE` when the asset list changes.
+
 ## UI conventions
 
-- Settings panels are `#settings-{general,gaming,cloaking,proxy,info,updates}`.
+- Settings panels are `#settings-{general,gaming,cloaking,debug,proxy,info,updates}`.
   Sidebar entries carry `data-target` that must equal the panel suffix; deep
   links use `/?launch=1&settings=1&section=proxy`. `switchSettingsPage()` ignores
   unknown targets instead of blanking the area — keep that behaviour.
@@ -138,11 +202,15 @@ Rules that must not regress:
   `ensureTransport(true)`. Never assign `iframe.src` directly: the SW error page
   and the controller cache both depend on the `go()` path.
 - Toasts: `showToast(type, message, iconClass)` from `t.js`/inline.
+- New toggles: put `<div class="graip-toggle-slot" data-slot="name"></div>` in the panel and mount a
+  clone in `debug-panel.js`. Do not copy the 40-line SVG switch markup by hand.
+- New dropdowns: `<select class="settings-select">` is styled and already used by the panic controls;
+  the custom `.x-selector` components are only worth it for ones with icons.
 
 ## Testing and verification
 
 ```bash
-node --test tests/*.test.js      # the only supported command; must stay green
+node --test tests/*.test.js      # the only supported command; must stay green (76 tests)
 ```
 
 No network access is needed (or allowed) for the suites. They run in a `vm`
@@ -193,3 +261,11 @@ Harness notes:
   once: the Movies tab opens the built-in page, side menus deep-link to
   `/?launch=1&settings=1`, and every `navTo()`/`switchSettingsPage()` target
   exists.
+- `tests/panic-log.test.js` (log filtering/redaction, panic key matching, panic
+  navigation, panic page structure, cloak profiles, tab restore, omnibox) and
+  `tests/mobile-pwa.test.js` (media-query-only CSS, manifest, service worker
+  shell caching, library hygiene) cover the features added on top of the fork.
+  Both load the real modules into a `vm` context with a fake DOM/storage; prefer
+  extending them over adding a new harness.
+- Anything that changes the top-level URL, title or storage must also update
+  `AGENTS.md`: the cloaking story is easy to break silently.

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" data-graip-no-auto-cloak="1">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Google</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/img/fav.png" id="tabIcon">
+    <!--
+        Panic page.
+
+        This document is self-contained on purpose: no stylesheets, no fonts, no
+        CDN, no proxy. It has to work when every one of those is blocked.
+
+        It renders a black screen and a decoy site inside a frame, and it keeps the
+        frame invisible until the target has actually loaded (and, for same-origin
+        targets, painted). Nothing from graip is visible at any point, including
+        while the decoy is still loading.
+    -->
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        /* the black screen: the only thing visible until the target is ready */
+        #blackout {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 2;
+            transition: opacity .18s linear;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background: #fff;
+        }
+
+        #stage iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+        }
+
+        body.revealed #blackout {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #hint {
+            position: fixed;
+            right: 14px;
+            bottom: 12px;
+            z-index: 3;
+            font: 12px/1.4 Arial, Helvetica, sans-serif;
+            color: #9aa0a6;
+            opacity: 0;
+            transition: opacity .25s;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        body.hint-on #hint {
+            opacity: .9;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="stage"></div>
+    <div id="blackout"></div>
+    <div id="hint">press <b>Esc</b> to go back</div>
+
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
+    <script>
+        (function () {
+            "use strict";
+
+            const params = new URLSearchParams(window.location.search);
+            const target = params.get("to") || "about:blank";
+            const cloak = params.get("cloak") || "None";
+            const plain = params.get("plain") === "1";
+
+            const stage = document.getElementById("stage");
+            const body = document.body;
+
+            const profile = window.GraipCloak ? window.GraipCloak.profile(cloak) : null;
+            const chosen = profile && profile.id !== "None" ? profile : null;
+
+            document.title = chosen ? chosen.title : "Google";
+            const icon = document.getElementById("tabIcon");
+            if (icon && chosen) icon.href = chosen.icon;
+
+            // The target is in the query string only long enough to start the
+            // load: the address bar must not keep a record of where the decoy
+            // went (the current history entry was already replaced, so there is
+            // nothing to go "back" to except the decoy itself).
+            try {
+                history.replaceState({}, "", "/panic.html");
+            } catch (error) {
+                /* replaceState can be blocked in odd embeddings */
+            }
+
+            if (window.GraipLog) {
+                window.GraipLog.info("panic", "decoy page loading", {
+                    target: /^about:blank$/i.test(target) ? "about:blank" : window.GraipLog.safeUrl(target),
+                    cloak: cloak,
+                });
+            }
+
+            // Last-resort reveal: a site that never fires `load` (or is cross-origin
+            // and therefore unobservable) must not leave the screen black forever.
+            const HARD_TIMEOUT = 20000;
+            let revealed = false;
+
+            function reveal(reason) {
+                if (revealed) return;
+                revealed = true;
+                body.classList.add("revealed");
+                if (window.GraipLog) window.GraipLog.debug("panic", `revealed (${reason})`);
+            }
+
+            // A decoy-free panic (showDecoy off) goes straight to the target.
+            const isBlank = /^about:blank$/i.test(target);
+            if (isBlank) {
+                document.title = chosen ? chosen.title : "Google";
+                stage.innerHTML = "<!-- about:blank decoy -->";
+                if (chosen) stage.innerHTML = window.GraipCloak.blankDocument(cloak);
+                reveal("about:blank");
+                return;
+            }
+
+            if (plain) {
+                // no decoy site: navigate this tab straight to the target, still
+                // behind the black screen so nothing flashes
+                window.GraipLog && window.GraipLog.debug("panic", "plain mode, following target");
+                window.location.replace(target);
+                return;
+            }
+
+            const frame = document.createElement("iframe");
+            frame.setAttribute("referrerpolicy", "no-referrer");
+            frame.setAttribute("allow", "clipboard-write");
+            frame.title = chosen ? chosen.title : "document";
+
+            let settled = false;
+            const settle = () => {
+                if (settled) return;
+                settled = true;
+
+                // Same-origin decoys (about:blank, our own pages) can be inspected:
+                // wait one paint after `load` so the user never sees a white flash.
+                let sameOrigin = false;
+                try {
+                    sameOrigin = Boolean(frame.contentWindow && frame.contentWindow.document);
+                } catch (error) {
+                    sameOrigin = false;
+                }
+
+                const finish = () => requestAnimationFrame(() => requestAnimationFrame(() => reveal("loaded")));
+                if (sameOrigin) {
+                    // two frames plus a tick: enough for fonts/layout in a static page
+                    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(finish, 60)));
+                } else {
+                    // cross-origin: `load` already means the document is real
+                    setTimeout(finish, 80);
+                }
+            };
+
+            frame.addEventListener("load", settle, { once: true });
+
+            try {
+                frame.src = target;
+                stage.appendChild(frame);
+            } catch (error) {
+                window.GraipLog && window.GraipLog.error("panic", "could not load the decoy target", error);
+                window.location.replace(target);
+            }
+
+            setTimeout(() => {
+                reveal("timeout");
+                window.GraipLog && window.GraipLog.warn("panic", "decoy did not finish loading, showing it anyway", {
+                    afterMs: HARD_TIMEOUT,
+                });
+            }, HARD_TIMEOUT);
+
+            // Escape goes back to graip (or to the previous page when the decoy was
+            // the first thing in this tab). The hint appears on the first movement
+            // so a glance at the screen does not give it away.
+            const showHint = () => body.classList.add("hint-on");
+            window.addEventListener("mousemove", showHint, { once: true });
+            window.addEventListener("touchstart", showHint, { once: true });
+
+            window.addEventListener("keydown", (event) => {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                window.GraipLog && window.GraipLog.info("panic", "escape pressed, returning");
+
+                let returning = false;
+                try {
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.focus();
+                        window.close();
+                        returning = true;
+                    }
+                } catch (error) {
+                    /* cross-origin opener: fall through to history */
+                }
+
+                if (!returning) history.back();
+            });
+
+            // Leaving the decoy (back/forward) restores the black screen so a
+            // forward navigation never shows a stale page.
+            window.addEventListener("pagehide", () => {
+                document.getElementById("blackout").style.opacity = "1";
+            });
+        })();
+    </script>
+</body>
+
+</html>
