@@ -43,6 +43,7 @@
 <body>
     <div class="nav-logo">
         <img src="/assets/img/fav.png" alt="" onclick="
+            if (!ul) return;
             ul.classList.add('active');
             const blurr = document.createElement('div')
             blurr.classList.add('bluroverlay')
@@ -268,6 +269,9 @@
     </div>
 
     <script defer>
+        // Neither page ships the sidebar markup (#nav-ul), so every reference to
+        // it has to be conditional: the old code threw on every logo click and on
+        // Ctrl+M, which also skipped the rest of the handler.
         const ul = document.getElementById("nav-ul")
 
         document.querySelectorAll("li a").forEach(link => {
@@ -279,7 +283,7 @@
 
         window.addEventListener("keydown", (e) => {
             if (e.ctrlKey && e.key === "m") {
-                console.log("Key pressed")
+                if (!ul) return
                 e.preventDefault()
                 if (!ul.classList.contains("active")) {
                     ul.classList.add("active")
@@ -293,7 +297,7 @@
                 } else {
                     ul.classList.remove("active")
                     const blurr = document.querySelector(".bluroverlay")
-                    blurr.remove()
+                    if (blurr) blurr.remove()
                 }
             }
         })

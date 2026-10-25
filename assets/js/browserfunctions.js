@@ -1,8 +1,27 @@
 let aTab = 0;
 let tabCounter = 1;
 let bTabs = [];
-// bare-mux is only used by the Ultraviolet backend now
-const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+
+/**
+ * bare-mux is only used by the Ultraviolet backend now, so it is created on
+ * first use instead of at script evaluation. Constructing it eagerly meant a
+ * missing/blocked /baremux/index.js or a worker that cannot start took the whole
+ * file down with a ReferenceError, which also killed the Scramjet path that does
+ * not need bare-mux at all.
+ *
+ * @returns {object|null} a BareMuxConnection, or null when bare-mux is missing
+ */
+let bareMuxConnection = null;
+function getBareMuxConnection() {
+  if (bareMuxConnection) return bareMuxConnection;
+  if (typeof BareMux === "undefined" || !BareMux.BareMuxConnection) {
+    console.warn("[graip] bare-mux is unavailable; the Ultraviolet backend cannot start");
+    return null;
+  }
+
+  bareMuxConnection = new BareMux.BareMuxConnection("/baremux/worker.js");
+  return bareMuxConnection;
+}
 
 const SEARCH_ENGINE_DEFAULT_MIGRATION = "graip_searchEngineGoogleDefaultV1";
 if (!localStorage.getItem(SEARCH_ENGINE_DEFAULT_MIGRATION)) {
@@ -499,6 +518,15 @@ async function go(target, tabId = aTab) {
 
     if (isUltravioletBackend()) {
       // Ultraviolet still talks through bare-mux, so it keeps the old transport
+      const connection = getBareMuxConnection();
+      if (!connection) {
+        setTabError(
+          "The Ultraviolet backend needs bare-mux, which did not load. Pick Scramjet in Settings or reload.",
+          tabId
+        );
+        return;
+      }
+
       if (!(await connection.getTransport())) {
         await connection.setTransport("/libcurl/index.mjs", [
           { websocket: await ensureTransport() },
@@ -684,19 +712,21 @@ function f() {
 }
 
 function r() {
-  const viewframe = document.querySelector(
-    `.viewframe[data-frame-id="${aTab}"]`
-  );
-  if (!viewframe) return;
-  const curl = viewframe.src;
+  const cTab = bTabs.find((t) => t.id === aTab);
+  if (!cTab) return;
 
-  // a dead wisp server may have come back up, so do not reuse the cached answer
+  // A dead wisp server may have come back up, so do not reuse the cached
+  // answer. Navigate through go() instead of setting iframe.src directly: that
+  // resets the per-tab route-recovery state and re-runs Scramjet's frame
+  // navigation, which is what actually re-issues the request through the new
+  // transport. Assigning src kept a failed tab pinned to its old transport.
   ensureTransport(true)
-    .catch(() => {
-      /* go() reports this; reloading should still be attempted */
+    .catch((error) => {
+      console.error("[graip] reload could not refresh the proxy route:", error);
     })
     .finally(() => {
-      viewframe.src = curl;
+      const target = cTab.url;
+      if (target) go(target, aTab);
     });
 }
 

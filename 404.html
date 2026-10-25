@@ -15,7 +15,7 @@
     <script src="/uv/uv.config.js"></script>
     <script src="/baremux/index.js"></script>
     <link rel="stylesheet" href="/styles/index.css">
-    <link rel="stylesheet" href="/assets/css/colors.css">
+    <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <script src="/assets/js/colors.js"></script>
     <link rel="stylesheet" href="/fa/css/all-pro.css">
 </head>
@@ -74,7 +74,9 @@
 
         window.addEventListener("load", () => {
             registerSW();
-            lucide.createIcons();
+            // lucide comes from a CDN: when a network filter blocks it the old
+            // unconditional call threw here and aborted the rest of this handler.
+            if (typeof lucide !== "undefined") lucide.createIcons();
         });
 
         const contentFrame = document.getElementById('contentFrame');

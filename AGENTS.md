@@ -1,14 +1,195 @@
 # Agent Notes
 
-## Proxy architecture and debugging
+Notes for anyone (human or agent) changing this repository. Read this before the
+first edit: most of what looks like dead code here is vendored upstream code, and
+most of the "weird" patterns are deliberate workarounds for a static host.
 
-- Main Scramjet, standalone browser, mini-browser, and embed pages load the page-side controller independently; shared browser helpers must be included in each HTML entry point, not just `index.html`. Ultraviolet has a separate worker and should not import Scramjet-specific error helpers.
-- Curl 60 comes from vendored libcurl.js (TLS verification inside WASM); Wisp handshake health does not establish destination TLS health. Error 60 alone does not identify whether the endpoint chain, local CA trust, or route path caused verification failure.
-- `libcurl/index.mjs` and `libcurl/libcurl.mjs` are generated package bundles that should be updated together from a reproducible upstream build; do not hand-edit the embedded WASM trust material or disable TLS verification.
+## What this is
 
-## Tests
+Graip is a fork of [Cherri](https://github.com/x8rr/cherri) — a static
+"unblocked games / web proxy" site. There is **no build step and no package
+manifest**. Every file under version control is served as-is, so:
 
-- There is no root package manifest or pre-existing test runner; use dependency-free tests with `node --test tests/*.test.js`.
-- `sw.js` is a worker and depends on imported Scramjet globals; isolated Node tests need a VM harness that mocks `importScripts`, `self.addEventListener`, and the controller.
-- Scramjet request-failure feedback is routed through `handleProxyFailure()` from the proxied frame's `onload` marker; therefore the page controller performs route recovery. The service worker only renders/classifies the failure response. Code-60 retry limits belong in the page-side recovery path, with SW copy kept consistent.
-- Browser-side Wisp probes can establish endpoint handshake health, and direct `LibcurlClient.request()` calls in an isolated deployed browser can compare destination TLS by route; neither substitutes for Scramjet frame/navigation testing.
+- edit the HTML/CSS/JS that ships; never introduce a bundler, transpiler, or
+  `node_modules` dependency into the site itself;
+- the only tooling allowed is what exists in `tests/` (dependency-free
+  `node:test`) plus an optional throwaway jsdom harness for verification;
+- `stores/` (2.5 GB), `libcurl/` (6 MB), `uv/`, `baremux/`, `fa/`,
+  `homework/` and much of `assets/` are third-party drops. Do not reformat,
+  minify, or "clean up" them, and keep diffs to them mechanical.
+
+Deployment target is a static host (Vercel, or any file server). That means:
+no server-side routes, no trailing-slash rewrites, no `Location` handling, and
+**no `/wisp/` endpoint on this origin** — the "This site" preset only works if a
+deployment happens to put one there.
+
+## Layout
+
+| Path | What lives there |
+| --- | --- |
+| `index.html` | The whole app shell: sidebar, settings panels, tabs, `navTo()`, game/app list loaders. ~1.8k lines of markup *plus* most of the site's inline JS. |
+| `pages/*.html` | Everything `navTo()` loads into `#contentFrame`: `browser`, `browser-minimum`, `embed`, `play`, `movies`, `watch`, `movieframe`, `apps`, `games`, `partners`, `assistant`, `vms`, `chatrooms`, `gmbl`. No `settings.html` — settings live in `index.html`. |
+| `newtab.html`, `404.html`, `start.html` | `newtab` is the new-tab page; `404` is the host's not-found page; `start.html` is the Classroom disguise and is excluded from link/nav tests. |
+| `assets/js/` | First-party scripts (see below). `assets/js/lib/` is third-party. |
+| `assets/json/` | Game/app lists (`classplay.json`, `gn-math.json`, `apps.json`, `config/particles.json`). |
+| `assets/css/`, `styles/` | Theme variables (`colors.css` + `assets/css/themes/*.css`) and layout. |
+| `sw.js` | Scramjet's service worker: `importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js")`, plus an ad blocklist and the proxy error page. |
+| `uv/`, `baremux/` | Ultraviolet bundle + bare-mux worker. The older backend. |
+| `homework/` | Disguised names for the proxy runtime: `math.all.js` is Scramjet, `science.sync.js` is its inject script, `chemistry.sw.js` is the SW half, `english.bundle.js` is libcurl's page-side helpers. Treat the names as load-bearing. |
+| `libcurl/` | Generated libcurl.js bundles (see "Proxy stack"). |
+| `tests/` | `node --test` suites. This is the only supported test command. |
+
+## First-party JavaScript
+
+| File | Responsibility |
+| --- | --- |
+| `assets/js/wisp.js` | Wisp endpoint list, URL normalisation, handshake probe, pooled failover, `configureTransport()`, `describeError()`. Everything is exposed as `window.GraipWisp`. |
+| `assets/js/dropdown.js` | Custom dropdown widgets: Wisp selector, search engine, game store, backend, particles. Reads `GraipWisp`; must load **after** `wisp.js`. |
+| `assets/js/browserfunctions.js` | Tab model, `go()`/`nav()`, frame creation, Scramjet controller bootstrap, transport wiring, route recovery. Loaded by every browsing page *after* `math.all.js`, `wisp.js`, `english.bundle.js`. |
+| `assets/js/proxy-errors.js` | Shared classifier for curl/libcurl failures (`GraipProxyErrors`). Used by both the page and the service worker. |
+| `assets/js/settings.js` | Legacy settings helpers. Also included by ~96 pages inside `stores/`, which have no settings UI at all — every lookup in it must stay optional. |
+| `assets/js/colors.js` | Applies the saved theme to `#css-theme-link` on first paint. |
+| `assets/js/vm.js` | Legacy Hyperbeam VM launcher; the markup it needs exists on no current page, so it must no-op. |
+| `assets/js/t.js` / `splash.js` / `cursor.js` | Toasts, homepage splash text, custom cursor. |
+
+Conventions:
+
+- Plain browser JS: no modules except `import("/libcurl/libcurl.mjs")`, no
+  TypeScript, no framework. `index.html` uses Alpine 3 (CDN) on some pages and
+  hand-written DOM code elsewhere.
+- 2-space indent in `assets/js`, 4-space indent in HTML, tabs in `sw.js` and the
+  vendored files. Match the surrounding file — this repo has three styles and
+  that is fine.
+- Personal/global state uses `localStorage` with the `graip_` prefix. Never
+  reuse a `cherri_` key (the old prefix is dead and intentionally not migrated
+  except where noted in code).
+- **Every DOM/global lookup in shared scripts must tolerate absence.** A page
+  that does not use a feature still loads the shared file, and one uncaught
+  `TypeError` at top level kills the rest of that file for that page. Guard
+  (`if (!el) return;`), do not assume.
+- User-visible strings are lowercase, short, and sentence-cased without a
+  trailing period on buttons ("Test current server", not "Test Server.").
+- Comments explain *why* a workaround exists, not what the next line does. The
+  existing comments are the reason this codebase is maintainable; add one when
+  you encode a non-obvious constraint.
+
+## Proxy stack
+
+Two backends, chosen in Settings → Proxy:
+
+1. **Scramjet** (default). The page owns the controller
+   (`new $scramjetController.Controller({ serviceworker, transport, config })`)
+   and the SW only forwards `prefix` requests back to it. Frames are per tab
+   (`scramjetFrames`). Prefix `/~/sj/`; runtime files are under `/homework/`.
+2. **Ultraviolet** (legacy). `uv/sw.js` handles `/uv/service/`, and bare-mux
+   carries the transport. bare-mux is created lazily (`getBareMuxConnection()`)
+   so a blocked `/baremux/index.js` cannot take down the Scramjet path.
+
+Transport: libcurl.js compiled to WASM, talking to a **Wisp** server over a
+WebSocket. `libcurl/` holds generated bundles:
+
+- `index.mjs` / `index.js` / `index.cjs` — UMD/ESM builds used by bare-mux and
+  by `import()`; each embeds the WASM as base64.
+- `libcurl.mjs` — the ES entry that `browserfunctions.js` imports.
+- All four were generated from `@mercuryworkshop/libcurl-transport@2.0.6` +
+  `libcurl.js@0.7.5`. **Never hand-edit the embedded base64 WASM, the CA bundle,
+  or the TLS verification flags.** To update: download both packages, rebuild the
+  bundle, re-run `tests/libcurl-bundle.test.js` (it checks the WASM magic,
+  `wasm not loaded` messaging, the 15 s load timeout, and the `libcurl_abort`
+  path).
+
+### Wisp selection contract
+
+Storage keys (`GraipWisp.KEYS`):
+
+- `graip_wispUrlSelected` — the endpoint the user picked (preset id, `Custom`,
+  or `Local`). **Never** overwritten by failover.
+- `graip_wispUrl` — the endpoint last used (may be a fallback).
+- `graip_wispUrlFallback` — set only when traffic moved automatically; cleared
+  when the preferred endpoint works again or the user picks.
+- `graip_wispUrlCustom`, `graip_wispUrlVerifiedAt` — custom URL and freshness.
+
+Rules that must not regress:
+
+- A probe is only successful when the server sends the initial Wisp packet
+  (v1 sends `CONTINUE` for stream 0 immediately; a socket that opens and stays
+  silent is not a Wisp server). A URL that does not end in `/` is not Wisp.
+- The preferred endpoint is probed alone first (1.5 s); only then is the
+  community pool raced. Availability is not guaranteed for any public endpoint,
+  so never describe them as "official" or "reliable" in UI copy.
+- `setActiveServer()` (manual pick) clears the fallback and invalidates the
+  per-tab cache. `resetCache()` forces a fresh probe (Settings → "Test current
+  server").
+- `describeError()`/`GraipProxyErrors` classify curl codes: 7 = route down,
+  35 = TLS handshake, 60 = peer verification. Error 60 means the destination's
+  chain, the client's trust bundle, the clock, or route interception — **not**
+  that a different Wisp host will help; route retries exist to diagnose, and TLS
+  verification must stay on.
+
+## UI conventions
+
+- Settings panels are `#settings-{general,gaming,cloaking,proxy,info,updates}`.
+  Sidebar entries carry `data-target` that must equal the panel suffix; deep
+  links use `/?launch=1&settings=1&section=proxy`. `switchSettingsPage()` ignores
+  unknown targets instead of blanking the area — keep that behaviour.
+- Loaded pages are iframes inside `#contentFrame`; a page-local "Settings" link
+  must therefore be `/?launch=1&amp;settings=1` with `target="_top"`.
+- Reloading a proxied tab goes through `go(tab.url, tabId)` after
+  `ensureTransport(true)`. Never assign `iframe.src` directly: the SW error page
+  and the controller cache both depend on the `go()` path.
+- Toasts: `showToast(type, message, iconClass)` from `t.js`/inline.
+
+## Testing and verification
+
+```bash
+node --test tests/*.test.js      # the only supported command; must stay green
+```
+
+No network access is needed (or allowed) for the suites. They run in a `vm`
+context with mocked DOM/`localStorage`/`WebSocket`, so:
+
+- arrays created inside the context have a different `Array.prototype`; compare
+  with `JSON.stringify`, not `assert.deepStrictEqual`;
+- workers (`sw.js`) need `importScripts` and `self.addEventListener` mocks;
+- when a suite parses HTML, assert on strings (for example "does this page
+  include `id="css-theme-link"`") rather than booting a DOM.
+
+For behavioural checks, an out-of-tree jsdom harness works well:
+
+```bash
+python3 -m http.server 8899 --bind 0.0.0.0 &     # from the repo root
+cd /tmp/verify && npm i jsdom@24                  # throwaway, never committed
+```
+
+Harness notes:
+
+- `process.on("unhandledRejection", () => {})` is mandatory: jsdom surfaces page
+  errors as unhandled rejections and will otherwise kill the process.
+- Use `resources: "usable"` + `pretendToBeVisual: true`, wait for `load`, then
+  ~300 ms before clicking (dropdowns populate asynchronously).
+- Expect noise and filter it: `MessagePort`, `ServiceWorker`/`register`,
+  `lucide`/`marked`/`io`/Tailwind CDN failures, WebGL, `canvas.getContext()`
+  returning null, and `particles.js` drawing. None of that is a site bug.
+- Chromium/Playwright is not available here, so proxy traffic cannot be
+  exercised end to end. Do not claim a proxy fix is "verified" — say what was
+  and was not covered.
+
+## Known traps
+
+- Third-party endpoints `api.x8r.dev` (VMs, CometChat tokens) and the chat
+  socket server are long dead. Features built on them must degrade with a
+  visible message, not hang on a loader.
+- The movies grid talks to TMDb with a public key. The host is
+  `api.themoviedb.org`; `api.tmdb.org` does not serve the API.
+- CDN dependencies (Alpine, Tailwind, `marked`, `lucide`, `socket.io`,
+  `emoji-mart`, fonts) fail on filtered networks. Any feature that needs them
+  must check for the global before using it.
+- `stores/ucp-games/*`, `homework/math.all.js` and `assets/icons/fonts/index.html`
+  are huge vendored files: greps and diffs against them are noise, and
+  `start.html` is a byte-for-byte Classroom copy whose links are decoration.
+- The repo has a single commit of history; diff against
+  `https://github.com/x8rr/cherri` (shallow clone) to see what this fork changed.
+- `tests/site-wiring.test.js` enforces the invariants that were already broken
+  once: the Movies tab opens the built-in page, side menus deep-link to
+  `/?launch=1&settings=1`, and every `navTo()`/`switchSettingsPage()` target
+  exists.

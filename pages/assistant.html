@@ -278,25 +278,32 @@
     <div class="messages-container">
     </div>
 
+    <div id="particles-container"></div>
+
     <script>
         particlesJS.load('particles-container', '/assets/json/config/particles.json', function () {
             console.log('Particles.js config loaded');
         });
     </script>
     <script>
-        marked.setOptions({
-            gfm: true,
-            breaks: true,
-            langPrefix: 'language-',
-            highlight: function (code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    try {
-                        return hljs.highlight(code, { language: lang }).value;
-                    } catch (err) { }
+        // marked, highlight.js and KaTeX are CDN scripts. On a filtered network they
+        // never arrive, and the old top-level `marked.setOptions(...)` threw, which
+        // took out the chat wiring below it.
+        if (typeof marked !== "undefined") {
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                langPrefix: 'language-',
+                highlight: function (code, lang) {
+                    if (typeof hljs !== "undefined" && lang && hljs.getLanguage(lang)) {
+                        try {
+                            return hljs.highlight(code, { language: lang }).value;
+                        } catch (err) { }
+                    }
+                    return code;
                 }
-                return code;
-            }
-        });
+            });
+        }
     </script>
     <script src="/assets/js/vm.js" defer></script>
     <div id="cursor-thank-you-zxs"
@@ -320,11 +327,22 @@
             let processed = markdown.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
             processed = processed.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 
+            if (typeof marked === "undefined") {
+                // plain text is still a usable answer when the markdown renderer
+                // could not be downloaded
+                container.textContent = processed;
+                return;
+            }
+
             container.innerHTML = marked.parse(processed);
 
-            container.querySelectorAll("pre code").forEach((block) => {
-                hljs.highlightElement(block);
-            });
+            if (typeof hljs !== "undefined") {
+                container.querySelectorAll("pre code").forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+
+            if (typeof renderMathInElement !== "function") return;
 
             renderMathInElement(container, {
                 delimiters: [

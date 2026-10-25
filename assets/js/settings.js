@@ -1,8 +1,19 @@
+/**
+ * Shared settings helpers.
+ *
+ * This file is also loaded by ~96 pages inside stores/ (the vendored game
+ * bundles), which have no settings UI at all. Every DOM lookup and every
+ * GraipWisp call is therefore optional: an uncaught error here aborted the file
+ * and logged on every game page, and it also stopped the cloak/theme code below
+ * from running.
+ */
 const sections = document.querySelectorAll(".settings-section");
 const buttons = document.querySelectorAll(".settings-side button");
 const wispServers = document.querySelectorAll(".wisp-servers button")
 const currentWisp = document.getElementById("currentWisp");
-const savedWisp = GraipWisp.getConfiguredUrl();
+const savedWisp = (typeof GraipWisp !== "undefined" && GraipWisp.getConfiguredUrl)
+    ? GraipWisp.getConfiguredUrl()
+    : (localStorage.getItem("graip_wispUrl") ?? "wss://wisp.mercurywork.shop/"); // matches wisp.js PRESETS[0]
 const savedCloak = localStorage.getItem("graip_cloak") ?? "";
 const savedCloakIcon = localStorage.getItem("graip_cloakIcon") ?? "";
 const savedCloakTitle = localStorage.getItem("graip_cloakTitle") ?? "";
@@ -13,7 +24,7 @@ const tabTitle = document.querySelector('title');
 const themeLink = document.getElementById('css-theme-link');
 const savedTheme = localStorage.getItem('graip_theme') ?? 'midnight';
 
-if (savedCloakIcon || savedCloakTitle) {
+if ((savedCloakIcon || savedCloakTitle) && tabIcon) {
     tabIcon.href = savedCloakIcon || tabIcon.href;
     document.title = savedCloakTitle || document.title;
 }
@@ -24,21 +35,18 @@ function setTabTitle(v) {
 }
 
 function setTabIcon(v) {
-    tabIcon.href = `https://www.google.com/s2/favicons?domain=${v}&sz=256`;
-    localStorage.setItem("graip_cloakIcon", tabIcon.href);
+    const href = `https://www.google.com/s2/favicons?domain=${v}&sz=256`;
+    if (tabIcon) tabIcon.href = href;
+    localStorage.setItem("graip_cloakIcon", href);
 }
 
 function applyTheme(t) {
-  if (t !== "default") {
-    themeLink.href = `/assets/css/themes/${t}.css`;
-    localStorage.setItem("graip_theme", t);
-  } else {
-    themeLink.href = `/assets/css/colors.css`;
-    localStorage.setItem("graip_theme", "default");
-  }
+  const href = t !== "default" ? `/assets/css/themes/${t}.css` : `/assets/css/colors.css`;
+  if (themeLink) themeLink.href = href;
+  localStorage.setItem("graip_theme", t !== "default" ? t : "default");
 }
 
-currentWisp.textContent = savedWisp;
+if (currentWisp) currentWisp.textContent = savedWisp;
 
 buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -76,6 +84,7 @@ function setWispStatus(text) {
  * server" on every request later.
  */
 function setWispServer(url, isCustom) {
+    if (typeof GraipWisp === "undefined") return;
     const normalized = GraipWisp.setActiveServer(url, { custom: !!isCustom });
 
     if (!normalized) {
@@ -86,7 +95,7 @@ function setWispServer(url, isCustom) {
         return;
     }
 
-    currentWisp.textContent = normalized;
+    if (currentWisp) currentWisp.textContent = normalized;
 
     const input = document.getElementById("customWisp");
     if (input && input === document.activeElement) input.value = normalized;
@@ -124,6 +133,7 @@ function setCustomWispServer() {
 }
 
 function testWispServer() {
+    if (typeof GraipWisp === "undefined") return;
     const url = GraipWisp.getConfiguredUrl();
 
     GraipWisp.resetCache();
@@ -141,11 +151,13 @@ function testWispServer() {
 // prefill the custom box with whatever was typed in last
 (function () {
     const input = document.getElementById("customWisp");
+    if (!input || typeof GraipWisp === "undefined") return;
     const custom = localStorage.getItem(GraipWisp.KEYS.custom);
-    if (input && custom) input.value = custom;
+    if (custom) input.value = custom;
 })();
 
 function cloakMe(o) {
+    if (!tabIcon) return;
     switch (o) {
         case "gclassroom":
             tabIcon.href = "/assets/img/cloaks/gclassroom.png";

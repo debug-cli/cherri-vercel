@@ -87,7 +87,7 @@
                 </a>
             </li>
             <li>
-                <a href="https://stellar.gdn" data-page="movies">
+                <a onclick="navTo('movies')" href="#" data-page="movies">
                     <i class="ri-video-line"></i>
                 </a>
             </li>
@@ -181,7 +181,7 @@
                     <i class="far fa-gamepad-modern"></i>
                     Gaming
                 </div>
-                <div class="settings-section" onclick="switchSettingsPage('cloaking')" data-target="cloaks">
+                <div class="settings-section" onclick="switchSettingsPage('cloaking')" data-target="cloaking">
                     <i class="far fa-hood-cloak"></i>
                     Cloaking
                 </div>
@@ -193,7 +193,7 @@
                     <i class="far fa-info-circle"></i>
                     Info
                 </div>
-                <div class="settings-section" onclick="switchSettingsPage('updates')" data-target="info">
+                <div class="settings-section" onclick="switchSettingsPage('updates')" data-target="updates">
                     <i class="far fa-bell-on"></i>
                     Updates
                 </div>
@@ -755,7 +755,9 @@
 
         window.addEventListener("load", () => {
             registerSW();
-            lucide.createIcons();
+            // lucide comes from a CDN: when a network filter blocks it the old
+            // unconditional call threw here and aborted the rest of this handler.
+            if (typeof lucide !== "undefined") lucide.createIcons();
         });
 
         const contentFrame = document.getElementById('contentFrame');
@@ -836,19 +838,30 @@
         const allPages = document.querySelectorAll(".settings-page")
         const allButtons = document.querySelectorAll(".settings-section")
 
+        /**
+         * Show one settings panel and highlight its sidebar entry.
+         *
+         * The sidebar is the source of truth: `data-target` must match the real
+         * `#settings-<target>` id. Unknown targets are ignored so a bad
+         * data-target can never leave the content area blank, and deep links
+         * (/?launch=1&settings=1&section=proxy) land on the right panel.
+         */
         function switchSettingsPage(target) {
-            allPages.forEach(page => {
-                page?.classList.remove("settings-active")
-                document.querySelector(`#settings-${target}`)?.classList.add("settings-active")
+            const page = target ? document.querySelector(`#settings-${target}`) : null
+            if (!page) return
+
+            allPages.forEach(p => p.classList.remove("settings-active"))
+            page.classList.add("settings-active")
+
+            allButtons.forEach(btn => {
+                const active = btn.dataset.target === target
+                btn.style.background = active ? "var(--bg-3)" : ""
             })
         }
 
         allButtons.forEach(button => {
             button.addEventListener("click", () => {
-                allButtons.forEach(btn => {
-                    btn.style.background = ""
-                    button.style.background = "var(--bg-3)"
-                })
+                switchSettingsPage(button.dataset.target)
             })
         })
 
@@ -1242,6 +1255,17 @@
             if (params.get("page") && params.get("launch")) {
                 navTo(params.get("page"))
             }
+            // Deep link to the settings panel. The menus inside pages/games.html,
+            // apps.html, partners.html and movieframe.html point here (with
+            // target="_top"), so their settings entry opens the real panel
+            // instead of a missing /pages/settings.html.
+            if (params.get("settings") && params.get("launch")) {
+                const settingsSection = (params.get("section") || "").trim()
+                toggleSettings()
+                if (settingsSection) {
+                    switchSettingsPage(settingsSection)
+                }
+            }
         })
     </script>
     <script>
@@ -1293,9 +1317,22 @@
             if (el) el.textContent = text
         }
 
+        /**
+         * Show the endpoint traffic is actually using. When an automatic
+         * fallback is in play the saved choice is still shown, because that is
+         * what the next load will try first.
+         */
         function setCurrentWispServer(url) {
             const el = document.getElementById("wispCurrentServer")
-            if (el) el.textContent = url || "Unknown"
+            if (!el) return
+
+            const fallback = typeof GraipWisp !== "undefined" && GraipWisp.getFallbackUrl
+                ? GraipWisp.getFallbackUrl()
+                : null
+
+            el.textContent = fallback && fallback === url
+                ? `${url} (automatic fallback; saved choice is retried on reload)`
+                : url || "Unknown"
         }
 
         // Keep the last custom URL ready when the user switches back to custom mode.
@@ -1304,7 +1341,7 @@
             wispInputEl.value = localStorage.getItem(GraipWisp.KEYS.custom) || ""
         }
         if (typeof GraipWisp !== "undefined") {
-            setCurrentWispServer(GraipWisp.getConfiguredUrl())
+            setCurrentWispServer(GraipWisp.getActiveUrl())
         }
         document.addEventListener("graipWispServerChanged", (event) => {
             setCurrentWispServer(event.detail)

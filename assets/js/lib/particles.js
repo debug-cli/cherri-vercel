@@ -934,7 +934,10 @@ function isInArray(e, a) {
       e || (e = "particles-js");
     var t = document.getElementById(e),
       i = "particles-js-canvas-el",
-      n = t.getElementsByClassName(i);
+      n = t && t.getElementsByClassName(i);
+    // A page can call particlesJS without shipping the container element;
+    // returning quietly beats throwing on every load of that page.
+    if (!t) return;
     if (n.length) for (; n.length > 0; ) t.removeChild(n[0]);
     var s = document.createElement("canvas");
     (s.className = i),

@@ -26,19 +26,25 @@
   /**
    * Fallback pool, tried in order when the configured server does not answer.
    *
-   * Order matters: this is the order servers get probed in. Phantom and Mercury
-   * are preferred fallbacks, while public endpoints can go offline or become
-   * blocked without notice. The rest stay available as last-resort choices.
+   * Order matters: this is the order servers get probed in, so the publicly
+   * documented endpoints (the ones upstream Scramjet, libcurl.js and the Wisp
+   * docs point at) come first and community mirrors follow. Every entry is a
+   * *candidate*: a server is only used after it answered a real Wisp handshake.
    */
   const PRESETS = [
-    { id: "Phantom", name: "Phantom", url: "wss://phantom.lol/wisp/" },
     {
       id: "Mercury",
-      name: "Mercury",
+      name: "Mercury (public demo)",
       url: "wss://wisp.mercurywork.shop/",
     },
+    { id: "Anura 1", name: "Anura 1", url: "wss://anura.pro/" },
+    { id: "Phantom", name: "Phantom", url: "wss://phantom.lol/wisp/" },
 
+    // Both of these are advertised by community docs; the bare host and the
+    // /wisp/ path have each been the working one at different times, so try
+    // both instead of guessing.
     { id: "rhw", name: "RHW", url: "wss://wisp.rhw.one/" },
+    { id: "rhw-wisp", name: "RHW (/wisp/)", url: "wss://wisp.rhw.one/wisp/" },
 
     { id: "Alu 1", name: "Alu 1", url: "wss://aluu.xyz/wisp/" },
     { id: "Alu 2", name: "Alu 2", url: "wss://freemathhw.xyz/wisp/" },
@@ -87,7 +93,6 @@
       url: "wss://lichology.com/wisp/",
     },
 
-    { id: "Anura 1", name: "Anura 1", url: "wss://anura.pro/" },
     { id: "Anura 2", name: "Anura 2", url: "wss://adoptmy.baby/" },
     { id: "Anura 3", name: "Anura 3", url: "wss://wallstjournal.click/" },
     { id: "Anura 4", name: "Anura 4", url: "wss://mexicoon.top/" },
@@ -126,17 +131,56 @@
   ];
 
   const KEYS = {
-    /** Active endpoint. Always a validated ws(s) URL ending in "/". */
+    /**
+     * Last endpoint a request was actually sent through. This may be an
+     * automatic fallback, which is why it is *not* the user's preference.
+     */
     active: "graip_wispUrl",
-    /** Preset id chosen from the settings dropdown. */
+    /**
+     * The endpoint the user chose (a preset id, "Custom", or absent for the
+     * default). Automatic failover must never overwrite this: a server that was
+     * down for one minute should not permanently replace the choice someone
+     * made deliberately.
+     */
     preset: "graip_wispUrlSelected",
     /** Last endpoint typed in by hand, kept so it can be retried later. */
     custom: "graip_wispUrlCustom",
     /** Timestamp of the last successful handshake. */
     verifiedAt: "graip_wispUrlVerifiedAt",
+    /**
+     * Endpoint picked automatically because the preferred one did not answer.
+     * Cleared as soon as the preferred endpoint works again.
+     */
+    fallback: "graip_wispUrlFallback",
   };
 
+  /**
+   * The endpoint used when the user has never chosen one. This is the public
+   * Wisp server that the upstream libcurl.js and Wisp documentation advertise.
+   */
   const DEFAULT_URL = PRESETS[0].url;
+
+  /**
+   * A Wisp server can be hosted by this deployment itself. It is worth offering
+   * in the picker (a self-hosted endpoint is the fastest and most reliable
+   * option) but it is not added to the automatic probe pool, because most
+   * static deployments do not run one and probing it would waste a handshake
+   * timeout on every navigation.
+   *
+   * @returns {{id: string, name: string, url: string}|null}
+   */
+  function localPreset() {
+    const loc = global.location;
+    if (!loc || !loc.host || !loc.protocol) return null;
+    if (loc.protocol !== "https:" && loc.protocol !== "http:") return null;
+
+    const scheme = loc.protocol === "https:" ? "wss:" : "ws:";
+    return {
+      id: "Local",
+      name: `This site (${loc.host})`,
+      url: `${scheme}//${loc.host}/wisp/`,
+    };
+  }
 
   function storage() {
     try {
@@ -218,23 +262,67 @@
 
   /**
    * Resolve the endpoint the user asked for, without trusting that it is usable.
-   * The active URL wins (that is what failover persists); a hand typed custom URL
-   * and the dropdown preset are fallbacks for anyone whose localStorage was only
-   * half populated by an older build.
+   * The user's saved choice wins: a dropdown preset, a hand typed custom URL, or
+   * this deployment's own /wisp/ endpoint. Only when nothing was ever chosen does
+   * the remembered active URL (possibly a fallback) or the default apply.
    *
    * @returns {string} a normalized URL, always safe to hand to libcurl
    */
   function getConfiguredUrl() {
-    const active = normalizeWispUrl(read(KEYS.active));
-    if (active) return active;
+    const selection = read(KEYS.preset);
+
+    // An explicit pick always wins. Automatic failover writes KEYS.active and
+    // KEYS.fallback only, so the next page load retries the endpoint the user
+    // actually chose instead of silently staying on a fallback forever.
+    if (selection === "Custom") {
+      const custom = normalizeWispUrl(read(KEYS.custom));
+      if (custom) return custom;
+    }
+
+    // "Fallback" is what older builds wrote over the selection; treat it as
+    // "no explicit choice" so it heals instead of sticking.
+    const preset = presetForId(selection);
+    if (preset) return preset.url;
+
+    const local = localPreset();
+    if (local && selection === local.id) return local.url;
 
     const custom = normalizeWispUrl(read(KEYS.custom));
     if (custom) return custom;
 
-    const preset = presetForId(read(KEYS.preset));
-    if (preset) return preset.url;
+    // Nothing was ever chosen (fresh install, or only an old active URL).
+    const active = normalizeWispUrl(read(KEYS.active));
+    if (active) return active;
 
     return DEFAULT_URL;
+  }
+
+  /**
+   * The endpoint that was last used successfully, which is not necessarily the
+   * one the user chose: it can be an automatic fallback.
+   *
+   * @returns {string} a normalized URL
+   */
+  function getActiveUrl() {
+    const active = normalizeWispUrl(read(KEYS.active));
+    return active || getConfiguredUrl();
+  }
+
+  /**
+   * The automatic fallback currently in use, or null when the configured
+   * endpoint is the one being used.
+   *
+   * @returns {string|null}
+   */
+  function getFallbackUrl() {
+    const fallback = normalizeWispUrl(read(KEYS.fallback));
+    if (!fallback) return null;
+    return fallback === normalizeWispUrl(getConfiguredUrl()) ? null : fallback;
+  }
+
+  /** @returns {boolean} whether traffic is going through an automatic fallback */
+  function isUsingFallback() {
+    return Boolean(getFallbackUrl());
   }
 
   /**
@@ -424,13 +512,23 @@
     if (!normalized) return null;
 
     write(KEYS.active, normalized);
+    // picking a server by hand ends any fallback state
+    write(KEYS.fallback, "");
+
     if (options && options.custom) {
       write(KEYS.custom, normalized);
       write(KEYS.preset, "Custom");
     }
 
     const preset = presetForUrl(normalized);
-    if (preset && !(options && options.custom)) write(KEYS.preset, preset.id);
+    const local = localPreset();
+    if (options && options.custom) {
+      // already handled above
+    } else if (preset) {
+      write(KEYS.preset, preset.id);
+    } else if (local && local.url === normalized) {
+      write(KEYS.preset, local.id);
+    }
 
     // a hand picked server has not been proven yet
     state.verified = null;
@@ -497,26 +595,18 @@
 
       if (result) {
         const previousActive = normalizeWispUrl(read(KEYS.active));
-        const previousSelection = read(KEYS.preset);
         write(KEYS.active, result.url);
         write(KEYS.verifiedAt, String(Date.now()));
-        const preset = presetForUrl(result.url);
-        const selectionChanged =
-          previousActive !== result.url ||
-          (result.url === preferred && preset && previousSelection !== preset.id) ||
-          (result.url !== preferred && previousSelection !== "Fallback");
-        if (
-          result.url === preferred &&
-          preset &&
-          previousSelection !== "Custom" &&
-          previousSelection !== "Fallback"
-        ) {
-          write(KEYS.preset, preset.id);
-        } else if (result.url !== preferred) {
-          write(KEYS.preset, "Fallback");
+
+        // Remember *why* traffic moved, without touching the saved preference.
+        if (result.url === preferred) {
+          write(KEYS.fallback, "");
+        } else {
+          write(KEYS.fallback, result.url);
         }
+
         state.verified = result;
-        if (selectionChanged && typeof global.dispatchEvent === "function") {
+        if (previousActive !== result.url && typeof global.dispatchEvent === "function") {
           try {
             global.dispatchEvent(
               new CustomEvent("graipWispServerChanged", { detail: result.url })
@@ -563,7 +653,7 @@
     if (!server) {
       const error = new Error(
         "No wisp server could be reached. Every proxy request will fail until a " +
-          "working server is set in Settings -> Browser."
+          "working server is set in Settings -> Proxy."
       );
       error.code = "NO_WISP_SERVER";
       error.attempted = candidateList(opts);
@@ -597,7 +687,7 @@
     if (error && error.code === "NO_WISP_SERVER") {
       return (
         "None of the proxy servers on the list could be reached. Open Settings -> " +
-        "Browser and set a wisp server that works on your network."
+        "Proxy and set a wisp server that works on your network."
       );
     }
 
@@ -638,6 +728,10 @@
     DEFAULT_URL,
     normalizeWispUrl,
     getConfiguredUrl,
+    getActiveUrl,
+    getFallbackUrl,
+    isUsingFallback,
+    localPreset,
     candidateList,
     presetForUrl,
     presetForId,

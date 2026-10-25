@@ -2040,9 +2040,59 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/emoji-mart/5.5.2/emoji-mart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/emoji-mart/5.5.2/emoji-mart.css" />
     <script>
+        /**
+         * The chat backend is an external socket.io server. When it is blocked by
+         * the network, offline, or its client script cannot load, the room used to
+         * sit on the skeleton loader forever with "io is not defined" in the
+         * console. Say so instead.
+         */
+        const CHAT_BACKEND = "https://qs03x443-3000.usw3.devtunnels.ms/";
+
+        function graipChatOffline(message) {
+            if (document.getElementById("chat-backend-notice")) return;
+
+            const notice = document.createElement("div");
+            notice.id = "chat-backend-notice";
+            notice.setAttribute("role", "status");
+            notice.style.cssText =
+                "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;" +
+                "max-width:min(90vw,540px);padding:12px 16px;border-radius:12px;text-align:center;" +
+                "font-size:14px;line-height:1.4;background:var(--bg-2,#1b1b1b);" +
+                "border:1px solid var(--border-3,#444);color:var(--text,#eee);";
+            notice.textContent = message;
+            document.body.appendChild(notice);
+
+            document.getElementById("skeletonLoader")?.remove();
+        }
+
+        if (typeof io !== "function") {
+            graipChatOffline(
+                "Chat is unavailable: the chat client script could not be loaded. " +
+                "A network filter is probably blocking it."
+            );
+        }
+    </script>
+    <script>
         class arrowchat {
             constructor() {
-                this.socket = io("https://qs03x443-3000.usw3.devtunnels.ms/");
+                this.socket = null;
+                this.offline = true;
+
+                if (typeof io === "function") {
+                    try {
+                        this.socket = io(CHAT_BACKEND, { timeout: 8000 });
+                        this.offline = false;
+                        this.socket.on("connect_error", () => {
+                            this.offline = true;
+                            graipChatOffline(
+                                "Chat is unavailable: the chat server did not answer. " +
+                                "It may be down or blocked on this network."
+                            );
+                        });
+                    } catch (error) {
+                        graipChatOffline("Chat is unavailable: " + (error && error.message));
+                    }
+                }
                 this.ip = "";
                 this.currentRoom = "general";
                 this.userRooms = this.loadUserRooms();
@@ -2069,6 +2119,16 @@
                     backdrop: document.getElementById("backdrop"),
                     skeletonLoader: document.getElementById("skeletonLoader"),
                 };
+
+                // Still render the shell when the backend is unreachable: a blank
+                // loading screen with a console error is worse than a shell plus
+                // the offline notice.
+                if (!this.socket) {
+                    if (this.elements.appContainer) this.elements.appContainer.style.opacity = "1";
+                    if (this.elements.skeletonLoader) this.elements.skeletonLoader.remove();
+                    return;
+                }
+
                 this.init();
             }
 
@@ -2410,7 +2470,17 @@
                         resolve(this.ip);
                         return;
                     }
+                    if (!this.socket) {
+                        resolve("");
+                        return;
+                    }
+
+                    // Without a timeout this promise never settles when the chat
+                    // server is unreachable, so the login modal (and the whole UI)
+                    // never appeared.
+                    const timer = setTimeout(() => resolve(""), 5000);
                     this.socket.once("ipAddress", ({ ip }) => {
+                        clearTimeout(timer);
                         this.ip = ip;
                         resolve(ip);
                     });
