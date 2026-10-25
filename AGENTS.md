@@ -56,6 +56,7 @@ deployment happens to put one there.
 | `assets/js/log.js` | `window.GraipLog`: the exportable debug log. Installs global capture (errors, rejections, `console.error/warn`, `fetch`, SW reports) and owns `graip_debugLog`, `graip_verboseLogs`. **Loads first on every page.** |
 | `assets/js/cloak.js` | `window.GraipCloak`: disguise profiles, panic key, `about:blank` window, decoy documents. Owns the `decoy`, `graip_cloak*`, `graip_panic*` keys. Loads on every page and re-applies the disguise on load. |
 | `assets/js/debug-panel.js` | Settings wiring for the Debug + Panic controls. Mounts toggles into `.graip-toggle-slot` placeholders by cloning an existing `.switch`, so new switches cannot drift visually. |
+| `assets/js/settings-io.js` | `window.GraipSettings`: settings export/import. Owns the `SCHEMA` allowlist, per-type validation, `collect/exportJSON/parse/apply/preview/reset/download/importFile`, and the Settings → Backup panel wiring. Also defines `GraipSettingsUiCopy`/`GraipSettingsUiReset`. |
 | `assets/js/t.js` / `splash.js` / `cursor.js` | Toasts, homepage splash text, custom cursor. |
 
 Conventions:
@@ -154,6 +155,31 @@ through `GraipLog.debug/info/warn/error(category, message, data)` and, for user 
 Adding a log line to a new feature is expected, not optional: "capture every action" is the point of
 the panel.
 
+## Settings export / import
+
+`GraipSettings` (`assets/js/settings-io.js`) is the only thing that may read or write settings in bulk.
+
+- `SCHEMA` is the **allowlist**, one entry per preference: `{ key, group, label, type }`, plus
+  `trueValue`/`falseValue` for the two toggle conventions (`yes`/`no` and `on`/`off`) and `options` for
+  enums. A new setting must be added there or it will not survive a backup. Types: `bool`, `token`,
+  `label`, `text`, `url`, `wisp`, `key`, `enum`.
+- Nothing else is exported. `IGNORED` names the runtime keys that must never travel (`graip_wispUrl`,
+  `graip_wispUrlFallback`, `graip_wispUrlVerifiedAt`, `graip_debugLog`, `graip_libraryIssues`,
+  `graip_siteVersion`), and `graip_tabs*` is skipped by prefix. The log is not a setting: it has its
+  own export.
+- Import **re-validates every value** — a config file is untrusted input. `url` accepts only
+  `http(s)://`, a single-leading-slash site path, or `about:blank`; `wisp` only `ws(s)://`; `token`
+  and `label` are anchored regexes so `../` cannot reach the theme `<link href>`. Rejected entries are
+  reported per key and never block the rest.
+- Merge semantics: absent keys are untouched, `null`/`""` on an optional key means "leave it alone",
+  unchanged values are not rewritten. Importing a Wisp choice clears `graip_wispUrl`,
+  `graip_wispUrlFallback` and `graip_wispUrlVerifiedAt`, otherwise the old probe result keeps winning.
+- Almost every subsystem reads its setting once at boot, so the panel reloads after an import. That
+  reload sets `sessionStorage.graip_skipLeaveGuard = "1"`, which the two `beforeunload` handlers in
+  `index.html` check (and `DOMContentLoaded` clears) so importing "confirm before leaving" does not
+  block its own reload.
+- The API never throws: no storage, quota exceeded or a missing `GraipLog` all degrade to a report.
+
 ## Panic and cloaking
 
 - `panic.html` is the only page that must render **nothing** of graip. It loads log.js and cloak.js
@@ -192,7 +218,7 @@ the panel.
 
 ## UI conventions
 
-- Settings panels are `#settings-{general,gaming,cloaking,debug,proxy,info,updates}`.
+- Settings panels are `#settings-{general,gaming,cloaking,backup,debug,proxy,info,updates}`.
   Sidebar entries carry `data-target` that must equal the panel suffix; deep
   links use `/?launch=1&settings=1&section=proxy`. `switchSettingsPage()` ignores
   unknown targets instead of blanking the area — keep that behaviour.
@@ -210,7 +236,7 @@ the panel.
 ## Testing and verification
 
 ```bash
-node --test tests/*.test.js      # the only supported command; must stay green (76 tests)
+node --test tests/*.test.js      # the only supported command; must stay green (104 tests)
 ```
 
 No network access is needed (or allowed) for the suites. They run in a `vm`
@@ -267,5 +293,9 @@ Harness notes:
   shell caching, library hygiene) cover the features added on top of the fork.
   Both load the real modules into a `vm` context with a fake DOM/storage; prefer
   extending them over adding a new harness.
+- `tests/settings-io.test.js` covers the settings file format: the allowlist,
+  per-type validation (`javascript:` icons, non-websocket Wisp URLs), partial
+  imports, ignoring runtime keys, reset semantics, and the no-storage /
+  no-logger failure paths.
 - Anything that changes the top-level URL, title or storage must also update
   `AGENTS.md`: the cloaking story is easy to break silently.

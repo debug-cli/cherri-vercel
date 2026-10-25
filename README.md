@@ -10,7 +10,7 @@
 <p>
   <a href="https://github.com/debug-cli/cherri-vercel/blob/main/LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-e2588d"></a>
   <img alt="No build step" src="https://img.shields.io/badge/build-none-brightgreen">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-76%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-104%20passing-brightgreen">
   <img alt="Proxy" src="https://img.shields.io/badge/proxy-Scramjet%20%2B%20Ultraviolet-blueviolet">
   <img alt="Transport" src="https://img.shields.io/badge/transport-libcurl.js%20%2B%20Wisp-informational">
 </p>
@@ -93,9 +93,25 @@ HTTPS traffic through a [Wisp](https://github.com/MercuryWorkshop/wisp-protocol)
 - **AI assistant**, **chatrooms**, **VMs**, **partners** pages.
 - **Extensive settings** — 16 themes, particles/fog, custom cursor, game overlay, confirm-on-leave,
   search engine, game store, backend, Wisp.
+- **Backup & restore** — save every setting to one JSON file and load it on another device (see below).
 - **Debug log** — see below.
 - **Installable PWA** with an offline shell: if the network is filtered after the first visit, the UI
   still loads so you can reach Settings → Proxy.
+
+### Settings backup (export / import)
+Settings → **Backup** writes every preference — theme, fog, cursor, cloak and panic options, Wisp route,
+backend, search engine, game store and logging — to a single `graip-settings-<date>.json` file, and
+reads one back. Three things worth knowing:
+
+- the file is an **allowlist**: preferences only. It never contains open tabs, history, the debug log
+  or the game-library health report, and a hand-edited file cannot write a key the site does not own;
+- every value is **re-validated on the way in**, so a shared config cannot smuggle in a `javascript:`
+  favicon or a non-websocket Wisp URL — bad entries are skipped and reported, the rest still apply;
+- a **partial file is a valid file**, so a two-line JSON snippet works as a patch, and importing text
+  from the clipboard (Settings → Backup → *Restore from text*) needs no download at all.
+
+Everything reloads after an import, because almost every subsystem reads its setting once at boot.
+*Reset all settings* restores the shipped defaults and leaves the log and your open tabs alone.
 
 ### Debug log (exportable)
 Settings → **Debug** records everything that happens: navigation, settings changes, Wisp probes,
@@ -127,7 +143,7 @@ in the parts that decide whether it *works* when you need it:
 | **Offline / filtered network** | Blank page, no way into Settings | Cached app shell still boots |
 | **Deployment** | Sometimes needs a Node build, a server, or a specific host | Pure static files; deploys to Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, or `python3 -m http.server` |
 | **Mobile** | Desktop-only chrome | Purpose-built small-screen layout (bottom nav, stacked tabs, full-width frames) |
-| **Tests** | Usually none | `node --test tests/*.test.js`, 76 dependency-free tests covering the proxy, Wisp handling, panic, logging, sessions, PWA shell and site wiring |
+| **Tests** | Usually none | `node --test tests/*.test.js`, 104 dependency-free tests covering the proxy, Wisp handling, panic, logging, sessions, settings backup, PWA shell and site wiring |
 
 What it is **not**: it is not a VPN, it does not host a proxy server, it does not bypass a network
 that blocks WebSockets entirely, and it cannot make a dead Wisp endpoint work.
@@ -270,6 +286,8 @@ proxy.example.com {
 | Clear session traces | Cloaking | Forgets open tabs and the scrubbed URL |
 | Verbose logging + Export | Debug | Turn the log down, or export it as JSON/TXT |
 | Check library now | Debug | Validates the bundled game/app lists and thumbnails |
+| Save settings file / Restore | Backup | Move every preference to another device or back; partial files patch, they do not wipe |
+| Reset all settings | Backup | Back to shipped defaults without touching the log or open tabs |
 
 ---
 
@@ -296,7 +314,7 @@ There is no build step and no package manifest.
 
 ```sh
 python3 -m http.server 8080     # serve the repo root
-node --test tests/*.test.js     # 76 tests, no dependencies, no network
+node --test tests/*.test.js     # 104 tests, no dependencies, no network
 ```
 
 Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md).
@@ -340,11 +358,12 @@ original code was written by x8r. Changes made in this fork:
 - **Tab sessions restored after reload**, omnibox shortcuts and search bangs
 - **Mobile layout** (desktop unchanged)
 - **PWA + offline shell** cache in the service worker
+- **Settings backup** — export/import every preference as one JSON file, with per-value validation
 - Fixed: Movies tab opened an external site; settings sidebar blanked the panel; side-menu settings
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader;
   shared scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`
 - Library hygiene: missing thumbnails get a placeholder and are reported
-- Added `tests/` (76 tests) and `AGENTS.md`
+- Added `tests/` (104 tests) and `AGENTS.md`
 
 Upstream: <https://github.com/x8rr/cherri>
 

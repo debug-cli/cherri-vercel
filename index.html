@@ -29,6 +29,7 @@
     <script src="/assets/js/colors.js"></script>
     <script src="/assets/js/splash.js" defer></script>
     <script src="/assets/js/debug-panel.js" defer></script>
+    <script src="/assets/js/settings-io.js" defer></script>
     <script src="/homework/english.bundle.js"></script>
     <script src="/assets/js/proxy-errors.js"></script>
     <script src="/assets/js/browserfunctions.js"></script>
@@ -204,6 +205,10 @@
                 <div class="settings-section" onclick="switchSettingsPage('debug')" data-target="debug">
                     <i class="far fa-bug"></i>
                     Debug
+                </div>
+                <div class="settings-section" onclick="switchSettingsPage('backup')" data-target="backup">
+                    <i class="far fa-floppy-disk"></i>
+                    Backup
                 </div>
                 <div class="settings-section" onclick="switchSettingsPage('updates')" data-target="updates">
                     <i class="far fa-bell-on"></i>
@@ -452,6 +457,54 @@
                     <p>Graip remembers your open tabs for this window only, so a reload does not lose them. Clear them
                         here (panicking already does this) and the address bar is reset too.</p>
                     <button class="button" onclick="GraipClearTraces()">Clear session traces</button>
+
+                    <br><br><br>
+                </div>
+
+                <div id="settings-backup" class="settings-page">
+                    <h2>Backup &amp; Restore</h2>
+                    <p>Your settings live only in this browser. Save them to a file here and you can move them to
+                        another device, another deployment, or back again after clearing site data.</p>
+                    <p class="hint">The file holds preferences only — theme, cloak and panic options, Wisp route,
+                        search engine, game store and logging. It never contains your tabs, your history or the debug
+                        log.</p>
+
+                    <div class="hcontainer debug-buttons">
+                        <button class="button" onclick="GraipSettings.download()">
+                            Save settings file
+                        </button>
+                        <button class="button" onclick="GraipSettingsUiCopy(this)">
+                            Copy as JSON
+                        </button>
+                    </div>
+
+                    <h3>Restore from a file</h3>
+                    <input id="settings-import-file" type="file" accept="application/json,.json" hidden>
+                    <button class="button" id="settings-import-pick">
+                        Choose settings file…
+                    </button>
+                    <p class="hint">Only the settings inside the file are changed. Everything else stays as it is, so a
+                        two-line file is a valid partial restore.</p>
+
+                    <h3>Restore from text</h3>
+                    <textarea id="settings-import-text" class="settings-backup-textarea" spellcheck="false"
+                        placeholder='{"format":"graip-settings","version":1,"settings":{"graip_theme":"void"}}'
+                        aria-label="Settings JSON to import"></textarea>
+                    <button class="button" id="settings-import-paste">
+                        Import pasted settings
+                    </button>
+
+                    <pre id="settings-import-status" class="debug-preview">Nothing imported yet.</pre>
+
+                    <h3>What this device would export</h3>
+                    <pre id="settings-summary" class="debug-preview">reading settings…</pre>
+
+                    <h3>Reset</h3>
+                    <p class="hint">Removes every saved preference and goes back to the shipped defaults. Your log and
+                        your open tabs are untouched.</p>
+                    <button class="button" onclick="GraipSettingsUiReset(this)">
+                        Reset all settings
+                    </button>
 
                     <br><br><br>
                 </div>
@@ -1373,7 +1426,10 @@
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("graip_confirmLeave") === "yes") {
+            // The settings importer reloads on purpose; that reload must not ask
+            // "leave site?" just because the import turned the guard on.
+            if (localStorage.getItem("graip_confirmLeave") === "yes" &&
+                sessionStorage.getItem("graip_skipLeaveGuard") !== "1") {
                 e.preventDefault()
                 e.returnValue = ""
             }
@@ -1409,13 +1465,18 @@
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("graip_confirmLeave") === "yes") {
+            // The settings importer reloads on purpose; that reload must not ask
+            // "leave site?" just because the import turned the guard on.
+            if (localStorage.getItem("graip_confirmLeave") === "yes" &&
+                sessionStorage.getItem("graip_skipLeaveGuard") !== "1") {
                 e.preventDefault()
                 e.returnValue = ""
             }
         })
 
         window.addEventListener("DOMContentLoaded", () => {
+            // one-shot flag set by the settings importer before it reloads
+            sessionStorage.removeItem("graip_skipLeaveGuard")
             const params = new URLSearchParams(window.location.search)
             if (!params.get("launch")) {
                 window.location.href = "/start.html"
