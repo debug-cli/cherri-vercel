@@ -1658,39 +1658,58 @@ span.online-count {
 
 @media (max-width: 640px) {
 
-    /* nav: the floating pill becomes a full-width bottom bar */
+    /* Compact 10-column bottom toolbar: fixed-width items used to overlap
+       when their combined width exceeded a phone's CSS viewport. */
     nav {
+        box-sizing: border-box;
         left: 0;
         right: 0;
         bottom: 0;
         top: auto;
         margin: 0;
         width: 100%;
-        height: 58px;
-        border-radius: 18px 18px 0 0;
+        height: 48px;
+        border-radius: 14px 14px 0 0;
         transform: none;
-        padding-left: 0;
-        padding-right: 0;
+        padding: 2px 4px;
     }
 
     nav ul {
-        justify-content: space-evenly;
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 1px;
         width: 100%;
         height: 100%;
         align-items: center;
+        justify-items: stretch;
     }
 
     nav ul li {
-        width: 44px;
-        height: 44px;
+        box-sizing: border-box;
+        width: auto;
+        min-width: 0;
+        height: 38px;
+        aspect-ratio: auto;
         margin: 0;
-        margin-top: 0;
-        flex: 0 0 auto;
+        flex: initial;
+    }
+
+    nav ul li a {
+        width: 100%;
+        height: 100%;
+        justify-content: center;
     }
 
     nav ul li a i {
-        transform: translate(-50%, 4%);
-        font-size: 21px;
+        left: auto;
+        transform: none;
+        font-size: clamp(16px, 4.6vw, 19px);
+    }
+
+    nav ul li img {
+        max-width: 20px;
+        max-height: 20px;
+        object-fit: contain;
     }
 
     nav ul li.divider {
@@ -1814,8 +1833,7 @@ span.online-count {
     }
 
     nav ul li {
-        width: 38px;
-        height: 38px;
+        height: 36px;
     }
 
     #homeContent {

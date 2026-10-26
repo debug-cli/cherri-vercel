@@ -54,3 +54,25 @@
     font-size: 15px;
     margin-right: 8px;
 }
+
+/* Keep feedback above the mobile bottom navigation. This stylesheet follows
+   index.css, so its positioning overrides the base translated toast stack. */
+@media (max-width: 640px) {
+    .toast-container {
+        top: auto !important;
+        right: 10px !important;
+        bottom: calc(48px + env(safe-area-inset-bottom, 0px) + 10px) !important;
+        left: 10px !important;
+        width: auto !important;
+        max-width: 420px;
+        height: 0 !important;
+        margin-inline: auto;
+        transform: none !important;
+    }
+
+    .toast {
+        box-sizing: border-box;
+        width: calc(100% - 10px);
+        font-size: 13px;
+    }
+}
