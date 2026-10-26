@@ -68,8 +68,14 @@
             pointer-events: none;
         }
 
+        /* Clickable as well as keyboard-reachable: a cross-origin target keeps
+           the keyboard focus inside its own frame, so the key listener above it
+           never sees the keypress. The hint sits above the frame, so it stays a
+           way out either way. */
         body.hint-on #hint {
             opacity: .9;
+            pointer-events: auto;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -77,7 +83,7 @@
 <body>
     <div id="stage"></div>
     <div id="blackout"></div>
-    <div id="hint">press <b>Esc</b> to go back</div>
+    <div id="hint" title="Return to graip">press <b>Esc</b> to go back</div>
 
     <script src="/assets/js/log.js"></script>
     <script src="/assets/js/cloak.js"></script>
@@ -176,7 +182,14 @@
                 }
             };
 
-            frame.addEventListener("load", settle, { once: true });
+            frame.addEventListener(
+                "load",
+                () => {
+                    listenInsideFrame();
+                    settle();
+                },
+                { once: true }
+            );
 
             try {
                 frame.src = target;
@@ -193,17 +206,58 @@
                 });
             }, HARD_TIMEOUT);
 
-            // Escape goes back to graip (or to the previous page when the decoy was
-            // the first thing in this tab). The hint appears on the first movement
-            // so a glance at the screen does not give it away.
-            const showHint = () => body.classList.add("hint-on");
-            window.addEventListener("mousemove", showHint, { once: true });
-            window.addEventListener("touchstart", showHint, { once: true });
+            // ---------------------------------------------------------- leaving
+            //
+            // Escape -- or the panic key itself -- goes back to graip exactly
+            // where the user left it. The location comes from the snapshot the
+            // panic wrote before it replaced that document; `history.back()` is
+            // only the last resort, because the entry behind a panic is usually
+            // /start.html (the disguise the tab was opened from), which made a
+            // return look like a brand-new open.
+            const hint = document.getElementById("hint");
+            const panicKey = (window.GraipCloak && window.GraipCloak.settings().key) || "Escape";
 
-            window.addEventListener("keydown", (event) => {
-                if (event.key !== "Escape") return;
-                event.preventDefault();
-                window.GraipLog && window.GraipLog.info("panic", "escape pressed, returning");
+            if (hint && panicKey !== "Escape") {
+                // name the key that is actually configured, without trusting it
+                // as markup
+                hint.textContent = "press Esc or ";
+                const strong = document.createElement("b");
+                strong.textContent = panicKey;
+                hint.append(strong, document.createTextNode(" to go back"));
+            }
+
+            function returnUrl() {
+                try {
+                    const value =
+                        (window.GraipCloak && window.GraipCloak.storedReturnUrl()) ||
+                        sessionStorage.getItem("graip_panicReturnUrl") ||
+                        "";
+                    return /^https?:\/\//i.test(value) ? value : "";
+                } catch (error) {
+                    return "";
+                }
+            }
+
+            function leave(reason) {
+                const target = returnUrl();
+                window.GraipLog && window.GraipLog.info("panic", "leaving the decoy", {
+                    reason,
+                    back: target ? window.GraipLog.safeUrl(target) : "(history)",
+                });
+
+                if (target) {
+                    // Consume the snapshot's URL: one panic, one return. The
+                    // shell state stays behind for graip to apply and clear.
+                    try {
+                        sessionStorage.removeItem("graip_panicReturnUrl");
+                    } catch (error) {
+                        /* ignore */
+                    }
+                    // replace, not assign: graip keeps the single history entry
+                    // it had before the panic, so Back still behaves.
+                    location.replace(target);
+                    return;
+                }
 
                 let returning = false;
                 try {
@@ -217,7 +271,50 @@
                 }
 
                 if (!returning) history.back();
-            });
+            }
+
+            function isLeaveKey(event) {
+                if (!event) return false;
+                if (event.key === "Escape") return true;
+                // The configured panic key closes the decoy too, so the one key
+                // both hides and restores the session.
+                try {
+                    if (window.GraipCloak && window.GraipCloak.matches(event)) return true;
+                } catch (error) {
+                    /* a broken setting must not trap the user in the decoy */
+                }
+                return false;
+            }
+
+            function onKey(event) {
+                if (!isLeaveKey(event)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                leave(event.key === "Escape" ? "escape" : "panic key");
+            }
+
+            // The hint appears on the first movement so a glance at the screen
+            // does not give it away, and clicking it leaves.
+            const showHint = () => body.classList.add("hint-on");
+            window.addEventListener("mousemove", showHint, { once: true });
+            window.addEventListener("touchstart", showHint, { once: true });
+            if (hint) hint.addEventListener("click", () => leave("hint"));
+
+            window.addEventListener("keydown", onKey, true);
+
+            /**
+             * A same-origin decoy (our own pages, about:blank) delivers its key
+             * events to the parent, so the listener above already sees them. A
+             * cross-origin target keeps them, which is what the hint is for.
+             */
+            function listenInsideFrame() {
+                try {
+                    const inner = frame.contentWindow && frame.contentWindow.document;
+                    if (inner) inner.addEventListener("keydown", onKey, true);
+                } catch (error) {
+                    /* cross-origin: nothing to attach to, by design */
+                }
+            }
 
             // Leaving the decoy (back/forward) restores the black screen so a
             // forward navigation never shows a stale page.

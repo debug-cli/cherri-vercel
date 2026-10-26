@@ -123,6 +123,23 @@
     showDecoy: true,
   };
 
+  /**
+   * `sessionStorage` keys that carry the return point across a panic.
+   *
+   * A same-tab panic *replaces* this document, so the tab keeps no memory of
+   * where the user was: `history.back()` from the decoy lands on whatever came
+   * before graip (usually `/start.html`, the disguise they arrived from), which
+   * looks like a brand-new open. These two keys are what makes the decoy able to
+   * put the user back exactly where they left off.
+   *
+   * They are session-scoped on purpose: closing the tab forgets them, and the
+   * "Clear session traces" button in Settings removes them explicitly.
+   */
+  const RETURN_KEYS = {
+    url: "graip_panicReturnUrl",
+    state: "graip_panicReturnState",
+  };
+
   function store() {
     try {
       return global.localStorage || null;
@@ -398,14 +415,97 @@ ${extraCss || ""}
       return true;
     }
 
+    // Where to come back to. Must happen before the document is replaced: after
+    // `location.replace` this script (and everything it could ask) is gone.
+    const point = rememberReturnPoint();
+
     try {
       global.sessionStorage.setItem("graip_panicReturn", "1");
+      // The panic is not the user "leaving" on purpose, so the confirm-leave
+      // guard must not turn a panic into a browser dialog.
+      global.sessionStorage.setItem("graip_skipLeaveGuard", "1");
     } catch (error) {
       /* sessionStorage can be unavailable in private mode */
     }
 
+    log("debug", "panic return point stored", {
+      url: point && point.url ? global.GraipLog && global.GraipLog.safeUrl(point.url) : "(none)",
+      state: Boolean(point && point.state),
+    });
+
     global.location.replace(decoyUrl(url, cloak, showDecoy));
     return true;
+  }
+
+  /**
+   * The URL this tab should reopen when the user leaves the decoy.
+   *
+   * @returns {string} an absolute http(s) URL, or "" when nothing was stored
+   */
+  function storedReturnUrl() {
+    try {
+      const value = global.sessionStorage && global.sessionStorage.getItem(RETURN_KEYS.url);
+      if (!value) return "";
+
+      const parsed = new URL(value);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+      // Only ever bounce back to this site: a write to sessionStorage from
+      // anywhere must not turn the decoy into an open redirect.
+      const here = new URL(global.location.href);
+      if (parsed.origin !== here.origin) return "";
+      return parsed.toString();
+    } catch (error) {
+      return "";
+    }
+  }
+
+  /**
+   * Forget the stored return point. The decoy calls this once it has used the
+   * URL; graip calls it after restoring the shell state.
+   */
+  function clearReturnPoint() {
+    try {
+      if (global.sessionStorage) {
+        global.sessionStorage.removeItem(RETURN_KEYS.url);
+        global.sessionStorage.removeItem(RETURN_KEYS.state);
+      }
+    } catch (error) {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Record where graip is right now, so the decoy can put it back.
+   *
+   * @returns {{ url: string, state: object|null }} what was stored
+   */
+  function rememberReturnPoint() {
+    const point = { url: "", state: null };
+
+    try {
+      point.url = String(global.location.href || "");
+    } catch (error) {
+      point.url = "";
+    }
+
+    try {
+      if (global.GraipShellState && typeof global.GraipShellState.capture === "function") {
+        point.state = global.GraipShellState.capture();
+      }
+    } catch (error) {
+      log("warn", "could not capture the graip position", error);
+    }
+
+    try {
+      if (global.sessionStorage) {
+        if (point.url) global.sessionStorage.setItem(RETURN_KEYS.url, point.url);
+        if (point.state) global.sessionStorage.setItem(RETURN_KEYS.state, JSON.stringify(point.state));
+      }
+    } catch (error) {
+      log("warn", "could not store the panic return point", error);
+    }
+
+    return point;
   }
 
   function openInNewTab(url, cloak) {
@@ -565,6 +665,7 @@ ${extraCss || ""}
 
   const api = {
     KEYS,
+    RETURN_KEYS,
     PROFILES,
     TARGETS,
     PANIC_KEYS,
@@ -578,6 +679,9 @@ ${extraCss || ""}
     targetUrl,
     matches,
     panic,
+    rememberReturnPoint,
+    storedReturnUrl,
+    clearReturnPoint,
     installPanicKey,
     autoAboutBlank,
     isCloaked,
