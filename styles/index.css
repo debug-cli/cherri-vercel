@@ -1712,6 +1712,16 @@ span.online-count {
         object-fit: contain;
     }
 
+    /* Cancel desktop-only inline offsets on the brand icon. */
+    nav ul li:first-child a {
+        margin: 0 !important;
+    }
+
+    nav ul li:first-child img {
+        height: 20px !important;
+        margin: 0 !important;
+    }
+
     nav ul li.divider {
         display: none;
     }
@@ -1730,6 +1740,29 @@ span.online-count {
     .searchathome input,
     #homesearch {
         width: min(92vw, 355px);
+    }
+
+    .searchathome {
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: min(92vw, 355px);
+        padding: 0 14px;
+    }
+
+    .searchathome > i {
+        flex: 0 0 auto;
+        margin: 0;
+    }
+
+    #homesearch {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+        box-sizing: border-box;
+        padding: 10px 0;
+        margin-right: 0 !important;
     }
 
     /* settings: sidebar tabs on top, content below */
