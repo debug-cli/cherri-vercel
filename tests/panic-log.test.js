@@ -275,6 +275,428 @@ test("panic_replaces_the_tab_and_forgets_the_session", () => {
   assert.equal(sessionStorage.getItem("graip_panicReturn"), "1");
 });
 
+test("panic_remembers_the_exact_return_point", () => {
+  const localStorage = fakeStorage();
+  localStorage.setItem("graip_panicEnabled", "yes");
+  const { cloak, sandbox, sessionStorage } = loadCloak({ localStorage });
+
+  // the shell publishes what it looked like before the document is replaced
+  sandbox.GraipShellState = {
+    capture: () => ({ view: "page", frameSrc: "/pages/browser.html", drawer: "settings", panel: "cloak" }),
+  };
+
+  cloak.panic({ reason: "test" });
+
+  assert.equal(sessionStorage.getItem("graip_panicReturnUrl"), "https://graip.test/?launch=1");
+  assert.deepEqual(JSON.parse(sessionStorage.getItem("graip_panicReturnState")), {
+    view: "page",
+    frameSrc: "/pages/browser.html",
+    drawer: "settings",
+    panel: "cloak",
+  });
+
+  // panicking is not "leaving on purpose": the confirm-leave guard must not
+  // turn it into a browser dialog
+  assert.equal(sessionStorage.getItem("graip_skipLeaveGuard"), "1");
+});
+
+test("the_stored_return_point_only_ever_points_back_at_this_site", () => {
+  const localStorage = fakeStorage();
+  localStorage.setItem("graip_panicEnabled", "yes");
+  const { cloak, sessionStorage } = loadCloak({ localStorage });
+
+  sessionStorage.setItem("graip_panicReturnUrl", "https://graip.test/?launch=1&page=games");
+  assert.equal(cloak.storedReturnUrl(), "https://graip.test/?launch=1&page=games");
+
+  // anything written by something else must not become an open redirect
+  sessionStorage.setItem("graip_panicReturnUrl", "https://evil.test/phish");
+  assert.equal(cloak.storedReturnUrl(), "");
+
+  sessionStorage.setItem("graip_panicReturnUrl", "javascript:alert(1)");
+  assert.equal(cloak.storedReturnUrl(), "");
+
+  sessionStorage.removeItem("graip_panicReturnUrl");
+  assert.equal(cloak.storedReturnUrl(), "", "no snapshot means no return target");
+});
+
+test("the_decoy_returns_to_graip_instead_of_history_back", () => {
+  const panic = read("panic.html");
+
+  // the return location comes from the snapshot, and replace() keeps the tab's
+  // single history entry -- history.back() used to land on /start.html
+  assert.match(panic, /function returnUrl\(\)/, "the decoy needs the stored return point");
+  assert.match(panic, /GraipCloak\.storedReturnUrl\(\)/, "it must ask cloak.js for the URL");
+  assert.match(panic, /location\.replace\(target\)/, "the return must replace, not push a new entry");
+  assert.match(panic, /history\.back\(\)/, "history is still the last resort when nothing was stored");
+
+  const leave = panic.slice(panic.indexOf("function leave("), panic.indexOf("function isLeaveKey("));
+  assert.ok(
+    leave.indexOf("location.replace(target)") < leave.indexOf("history.back()"),
+    "the stored URL must win over history.back()"
+  );
+});
+
+test("the_decoy_leaves_on_escape_or_on_the_configured_panic_key", () => {
+  const panic = read("panic.html");
+
+  assert.match(panic, /function isLeaveKey\(event\)/, "one place decides what leaves the decoy");
+  assert.match(panic, /event\.key === "Escape"/, "Escape always works");
+  assert.match(panic, /GraipCloak\.matches\(event\)/, "the panic key closes the decoy too");
+  assert.match(panic, /addEventListener\("keydown", onKey, true\)/, "keys are caught before the page sees them");
+
+  // a cross-origin target keeps the keyboard inside its own frame, so there
+  // must be a pointer way out as well
+  assert.match(panic, /hint\.addEventListener\("click"/, "the hint must be clickable");
+  assert.match(panic, /body\.hint-on #hint\s*\{[^}]*pointer-events:\s*auto/s);
+});
+
+/**
+ * Run the decoy page's own script against a fake document, so the return path is
+ * exercised rather than pattern-matched. Only what panic.html touches exists
+ * here; anything it never reaches is deliberately left out.
+ */
+function loadDecoy(options = {}) {
+  const html = read("panic.html");
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+  const code = inline[inline.length - 1];
+
+  const sessionStorage = options.sessionStorage || fakeStorage();
+  const windowListeners = [];
+  const hintListeners = [];
+  let backCount = 0;
+
+  const makeClassList = () => {
+    const set = new Set();
+    return {
+      set,
+      add: (name) => set.add(name),
+      remove: (name) => set.delete(name),
+      contains: (name) => set.has(name),
+    };
+  };
+
+  const frame = {
+    style: {},
+    setAttribute() {},
+    appendChild() {},
+    addEventListener(type, handler) {
+      if (type === "load") this.onload = handler;
+    },
+  };
+
+  const hint = {
+    textContent: "",
+    title: "",
+    append() {},
+    addEventListener(type, handler) {
+      if (type === "click") hintListeners.push(handler);
+    },
+  };
+
+  const sandbox = {
+    console: { log() {}, warn() {}, error() {} },
+    URL,
+    URLSearchParams,
+    sessionStorage,
+    setTimeout: () => 0,
+    clearTimeout() {},
+    requestAnimationFrame: () => 0,
+    history: {
+      replaceState() {},
+      back() {
+        backCount++;
+      },
+    },
+    location: {
+      search: options.search || "?to=https%3A%2F%2Fclassroom.google.com%2F&cloak=Google",
+      replace: (url) => (sandbox.__replaced = url),
+    },
+    addEventListener(type, handler) {
+      if (type === "keydown") windowListeners.push(handler);
+    },
+    GraipLog: {
+      info() {},
+      debug() {},
+      warn() {},
+      error() {},
+      safeUrl: (url) => url,
+    },
+    GraipCloak: {
+      settings: () => ({ key: options.panicKey || "\\" }),
+      profile: () => null,
+      storedReturnUrl: () => options.returnUrl || "",
+      matches: (event) => Boolean(options.panicKeyMatches && options.panicKeyMatches(event)),
+      blankDocument: () => "",
+    },
+    document: {
+      title: "Google",
+      body: { classList: makeClassList() },
+      getElementById: (id) =>
+        ({ stage: { appendChild() {}, style: {} }, blackout: { style: {} }, hint, tabIcon: { href: "" } })[id] || null,
+      createElement: (tag) => (tag === "iframe" ? frame : { style: {}, setAttribute() {}, appendChild() {}, textContent: "" }),
+      createTextNode: (text) => ({ text }),
+    },
+  };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(code, sandbox, { filename: "panic.html" });
+
+  const press = (event) => {
+    const keys = windowListeners;
+    for (const handler of keys) handler(event);
+  };
+
+  return { sandbox, sessionStorage, press, hint, hintListeners, back: () => backCount };
+}
+
+const keyEvent = (key) => ({ key, preventDefault() {}, stopPropagation() {} });
+
+test("the_decoy_returns_to_the_snapshot_url_on_escape", () => {
+  const sessionStorage = fakeStorage();
+  const { sandbox, press } = loadDecoy({
+    sessionStorage,
+    returnUrl: "https://graip.test/?launch=1&page=games",
+  });
+  sessionStorage.setItem("graip_panicReturnUrl", "https://graip.test/?launch=1&page=games");
+
+  press(keyEvent("Escape"));
+
+  assert.equal(
+    sandbox.__replaced,
+    "https://graip.test/?launch=1&page=games",
+    "Escape must reopen graip where it was, not navigate to start.html"
+  );
+  assert.equal(sessionStorage.getItem("graip_panicReturnUrl"), null, "the return point is used once");
+});
+
+test("the_decoy_also_leaves_on_the_configured_panic_key", () => {
+  const { sandbox, press } = loadDecoy({
+    panicKey: "\\",
+    panicKeyMatches: (event) => event.key === "\\",
+    returnUrl: "https://graip.test/?launch=1",
+  });
+
+  press(keyEvent("\\"));
+
+  assert.equal(sandbox.__replaced, "https://graip.test/?launch=1");
+});
+
+test("the_decoy_falls_back_to_history_when_nothing_was_stored", () => {
+  const { sandbox, press, back } = loadDecoy({ returnUrl: "" });
+
+  press(keyEvent("Escape"));
+
+  assert.equal(sandbox.__replaced, undefined, "nothing to reopen");
+  assert.equal(back(), 1, "history is the last resort");
+});
+
+test("the_decoy_ignores_keys_it_was_not_asked_to_watch", () => {
+  const { sandbox, press } = loadDecoy({ returnUrl: "https://graip.test/?launch=1" });
+
+  press(keyEvent("a"));
+  press(keyEvent("Enter"));
+
+  assert.equal(sandbox.__replaced, undefined);
+});
+
+/**
+ * Run the shell's `GraipShellState` module against a fake document, so restoring
+ * the place is exercised rather than pattern-matched.
+ */
+function loadShellState(options = {}) {
+  const home = read("index.html");
+  const start = home.indexOf("window.GraipShellState = (function () {");
+  const end = home.indexOf("function rSearch(input) {", start);
+  assert.ok(start > 0 && end > start, "GraipShellState must be findable in index.html");
+
+  const classList = (initial = []) => {
+    const set = new Set(initial);
+    return {
+      add: (name) => set.add(name),
+      remove: (name) => set.delete(name),
+      contains: (name) => set.has(name),
+    };
+  };
+
+  const frame = { style: {}, src: "", attrs: {}, getAttribute(name) { return this.attrs[name] || ""; } };
+  const homeContent = { style: {} };
+  const nav = { style: {} };
+  const homeBtn = { style: {} };
+  const settingsHolder = { classList: classList(["settings-hidden"]) };
+  const appsHolder = { classList: classList(["settings-hidden"]) };
+  const providers = {
+    settings: settingsHolder,
+    apps: appsHolder,
+    games: { classList: classList(["settings-hidden"]) },
+    partners: { classList: classList(["settings-hidden"]) },
+    download: { classList: classList(["settings-hidden"]) },
+  };
+
+  const calls = [];
+  const sessionStorage = options.sessionStorage || fakeStorage();
+  const documentListeners = [];
+
+  const sandbox = {
+    console: { log() {}, warn() {}, error() {} },
+    sessionStorage,
+    scrollY: 40,
+    scrollTo: (x, y) => calls.push(["scrollTo", y]),
+    addEventListener(type, handler) {
+      if (type === "DOMContentLoaded") documentListeners.push(handler);
+    },
+    GraipCloak: {
+      // mirrors cloak.js#clearReturnPoint: the snapshot is consumed, not kept
+      clearReturnPoint: () => {
+        calls.push(["clearReturnPoint"]);
+        sessionStorage.removeItem("graip_panicReturnUrl");
+        sessionStorage.removeItem("graip_panicReturnState");
+      },
+    },
+    GraipLog: { info() {}, debug() {}, warn() {}, error() {} },
+    switchSettingsPage: (name) => calls.push(["panel", name]),
+    toggleSettings: () => {
+      const hidden = settingsHolder.classList.contains("settings-hidden");
+      settingsHolder.classList.remove(hidden ? "settings-hidden" : "settings-shown");
+      settingsHolder.classList.add(hidden ? "settings-shown" : "settings-hidden");
+      calls.push(["toggleSettings"]);
+    },
+    toggleApps: () => calls.push(["toggleApps"]),
+    document: {
+      getElementById: (id) =>
+        ({ contentFrame: frame, homeContent, gohomeblock: homeBtn })[id] || null,
+      querySelector: (selector) => {
+        if (selector === "nav") return nav;
+        if (selector === ".settings-page.settings-active") return options.activePanel || null;
+        const match = selector.match(/^\.([a-z-]+)$/);
+        if (!match) return null;
+        const byClass = {
+          "settings-container": providers.settings,
+          "apps-wrapper": providers.apps,
+          "games-wrapper": providers.games,
+          "partners-wrapper": providers.partners,
+          "download-wrapper": providers.download,
+        };
+        return byClass[match[1]] || null;
+      },
+      body: { contains: (node) => node !== frame || options.frameInBody !== false },
+    },
+  };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(home.slice(start, end), sandbox, { filename: "index.html#GraipShellState" });
+
+  const boot = () => {
+    for (const handler of documentListeners) handler();
+  };
+
+  return { state: sandbox.GraipShellState, calls, sessionStorage, frame, homeContent, nav, homeBtn, settingsHolder, boot };
+}
+
+test("the_shell_ignores_a_snapshot_from_long_ago", () => {
+  const sessionStorage = fakeStorage();
+  sessionStorage.setItem(
+    "graip_panicReturnState",
+    JSON.stringify({
+      at: Date.now() - 10 * 60 * 1000,
+      view: "page",
+      frameSrc: "/pages/games.html",
+      frameInBody: true,
+    })
+  );
+
+  const { frame, boot } = loadShellState({ sessionStorage, frameInBody: true });
+  boot();
+
+  assert.equal(frame.src, "", "a ten-minute-old snapshot must not hijack the tab");
+  assert.equal(sessionStorage.getItem("graip_panicReturnState"), null, "it is still cleaned up");
+});
+
+test("the_shell_captures_where_the_user_is", () => {
+  const { state, settingsHolder } = loadShellState({ frameInBody: true });
+  settingsHolder.classList.remove("settings-hidden");
+  settingsHolder.classList.add("settings-shown");
+
+  const snapshot = state.capture();
+
+  assert.equal(snapshot.view, "home", "a pristine shell is on the home screen");
+  assert.equal(snapshot.drawer, "settings");
+  assert.equal(snapshot.scrollY, 40);
+  assert.equal(typeof snapshot.at, "number");
+});
+
+test("the_shell_replays_a_snapshot_after_a_panic", () => {
+  const { state, calls, frame, homeContent, settingsHolder } = loadShellState({ frameInBody: true });
+
+  const restored = state.restore({
+    view: "page",
+    frameSrc: "/pages/browser.html",
+    frameInBody: true,
+    frameDisplay: "block",
+    homeDisplay: "none",
+    navDisplay: "block",
+    navOpacity: "1",
+    homeBtnDisplay: "block",
+    drawer: "settings",
+    panel: "proxy",
+    scrollY: 0,
+  });
+
+  assert.equal(restored, true);
+  assert.equal(frame.src, "/pages/browser.html", "the open page must come back");
+  assert.equal(homeContent.style.display, "none", "the home screen stays hidden");
+  assert.ok(calls.some(([name]) => name === "toggleSettings"), "the settings sheet must reopen");
+  assert.equal(settingsHolder.classList.contains("settings-shown"), true);
+  assert.deepEqual(calls.find(([name]) => name === "panel"), ["panel", "proxy"], "the panel must come back");
+});
+
+test("the_shell_restores_once_and_forgets_the_snapshot", () => {
+  const sessionStorage = fakeStorage();
+  sessionStorage.setItem(
+    "graip_panicReturnState",
+    JSON.stringify({
+      view: "page",
+      frameSrc: "/pages/games.html",
+      frameInBody: true,
+      homeDisplay: "none",
+      drawer: null,
+      panel: "",
+    })
+  );
+
+  const { state, calls, frame, boot } = loadShellState({ sessionStorage, frameInBody: true });
+
+  boot();
+
+  assert.equal(frame.src, "/pages/games.html");
+  assert.ok(calls.some(([name]) => name === "clearReturnPoint"), "the snapshot is consumed");
+  assert.equal(sessionStorage.getItem("graip_panicReturnState"), null);
+
+  // a second boot must not re-apply anything
+  frame.src = "";
+  boot();
+  assert.equal(frame.src, "", "an empty snapshot does nothing");
+
+  assert.equal(state.capture().view, "page", "the restored view is what gets captured next");
+});
+
+test("the_shell_can_snapshot_and_restore_its_place", () => {
+  const home = read("index.html");
+
+  assert.match(home, /window\.GraipShellState = \(function \(\)/, "the shell publishes its state");
+  assert.match(home, /capture\(\)\s*\{/, "capture() records the place");
+  assert.match(home, /function restore\(state\)/, "restore() replays it");
+  assert.match(home, /frame\.src = state\.frameSrc/, "the open page goes back into the frame");
+  assert.match(home, /switchSettingsPage\(state\.panel\)/, "the settings panel comes back too");
+  assert.match(home, /graip_panicReturnState/, "the snapshot is read back on the next boot");
+  assert.match(
+    home,
+    /window\.addEventListener\("DOMContentLoaded", resume\)/,
+    "the restore must run after the deep-link handler"
+  );
+});
+
 test("panic_new_tab_mode_opens_a_window_instead_of_replacing_the_page", () => {
   const localStorage = fakeStorage();
   localStorage.setItem("graip_panicOpenIn", "new-tab");
@@ -297,7 +719,11 @@ test("panic_page_stays_black_until_the_target_loads", () => {
 
   assert.match(panic, /#blackout\s*\{[^}]*background:\s*#000/s, "the loading screen must be black");
   assert.match(panic, /body\.revealed #blackout/, "the black screen is only removed after a reveal");
-  assert.match(panic, /frame\.addEventListener\("load", settle/, "the reveal waits for the frame to load");
+  assert.match(
+    panic,
+    /frame\.addEventListener\(\s*"load",[\s\S]*?settle\(\)/,
+    "the reveal waits for the frame to load"
+  );
   assert.match(panic, /HARD_TIMEOUT/, "a target that never loads must still be revealed");
   assert.match(panic, /requestAnimationFrame\(\(\) => requestAnimationFrame/, "same-origin decoys wait for a paint");
   assert.match(panic, /Escape/, "the decoy must be escapable");

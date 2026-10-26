@@ -10,7 +10,7 @@
 <p>
   <a href="https://github.com/debug-cli/cherri-vercel/blob/main/LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-e2588d"></a>
   <img alt="No build step" src="https://img.shields.io/badge/build-none-brightgreen">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-106%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-121%20passing-brightgreen">
   <img alt="Proxy" src="https://img.shields.io/badge/proxy-Scramjet%20%2B%20Ultraviolet-blueviolet">
   <img alt="Transport" src="https://img.shields.io/badge/transport-libcurl.js%20%2B%20Wisp-informational">
 </p>
@@ -88,7 +88,7 @@ third domain for each. This one is meant to be the only tab you need:
   strips query strings before it stores anything). Preferences live in your own browser and can be
   saved to a file and restored on another machine — useful on school machines that wipe profiles, and
   useful for setting up a friend.
-- **It is maintained like software.** There are 106 automated tests, a documented engineering
+- **It is maintained like software.** There are 121 automated tests, a documented engineering
   handbook (`AGENTS.md`), a changelog of what the fork fixed, and a licence that keeps it open
   (AGPL-3.0). That is why a bug you report
   can actually be fixed, which is not true of a site whose repository is a screenshot and a Discord
@@ -153,7 +153,7 @@ No README is worth reading if it only sells. These are the real limits:
 | `Ctrl/Cmd + Shift + T` | Reopen the last closed tab |
 | `Alt + ←` / `Alt + →` | Back / forward |
 | `!g cats`, `!ddg cats`, `!b`, `!yt`, `!w`, `!gh`, `!r` | Search a specific site from the address bar |
-| Panic key (default `\`) | Panic: decoy page, then your destination |
+| Panic key (default `\`), then `Esc` or the same key again | Panic: decoy page, then your destination - and back to graip exactly where you were |
 
 Typing something with a dot in it goes to that site; anything else becomes a search with your chosen
 search engine.
@@ -180,12 +180,13 @@ search engine.
 ### Cloaking and privacy
 - **Panic key** — one key press replaces the tab with a decoy site, and the screen stays **black
   until the destination has finished loading**. Nothing from graip (no proxy, no half-loaded frame)
-  is ever visible during the panic. `Esc` on the decoy goes back.
+  is ever visible during the panic. `Esc` — or the panic key again — takes you back to graip **exactly
+  where you left it**: same page, same settings sheet, same browser tabs.
 - **Tab cloaking profiles** — title + favicon + the fake page shown inside the `about:blank` window,
   so the decoy tab isn't a blank page labelled "Google".
 - **about:blank mode** with an optional *auto about:blank* on every visit.
-- **Session traces** — the current URL is scrubbed from the address bar, and a panic wipes the stored
-  tab session.
+- **Session traces** — the current URL is scrubbed from the address bar, and *Clear session traces*
+  in Settings wipes the stored tab session on demand.
 - No analytics of proxied traffic; the debug log never records query strings.
 
 ### Everything else
@@ -239,13 +240,13 @@ in the parts that decide whether it *works* when you need it:
 | --- | --- | --- |
 | **Dead Wisp endpoint** | Every request fails with "error code 7" until the maintainer updates a hardcoded URL | Probes the handshake, fails over to another endpoint automatically, keeps your saved choice, and shows which route is live |
 | **TLS / SSL errors on a site** | "Site doesn't work", nothing to act on | curl 35/60/7 are detected, tried on a different route, and explained — with certificate verification kept on |
-| **Panic key** | Redirects to Google and flashes the proxy while it loads | Black screen until the decoy has loaded, then the decoy; `Esc` returns |
+| **Panic key** | Redirects to Google and flashes the proxy while it loads | Black screen until the decoy has loaded, then the decoy; `Esc` (or the panic key) returns to graip exactly where you were |
 | **Cloaking** | Favicon + title only, so the tab is titled "Google" with a blank page | Profiles bundle title + favicon + decoy page content |
 | **Debugging** | Console only, and the console closes with the tab | Exportable JSON/TXT log of every action, request and error, written to a file from Settings |
 | **Offline / filtered network** | Blank page, no way into Settings | Cached app shell still boots |
 | **Deployment** | Sometimes needs a Node build, a server, or a specific host | Pure static files; deploys to Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, or `python3 -m http.server` |
 | **Mobile** | Desktop-only chrome | Purpose-built small-screen layout (bottom nav, stacked tabs, full-width frames) |
-| **Tests** | Usually none | `node --test tests/*.test.js`, 106 dependency-free tests covering the proxy, Wisp handling, panic, logging, sessions, settings backup, PWA shell and site wiring |
+| **Tests** | Usually none | `node --test tests/*.test.js`, 121 dependency-free tests covering the proxy, Wisp handling, panic and its return path, logging, sessions, settings backup, PWA shell and site wiring |
 
 What it is **not**: it is not a VPN, it does not host a proxy server, it does not bypass a network
 that blocks WebSockets entirely, and it cannot make a dead Wisp endpoint work.
@@ -405,6 +406,8 @@ proxy.example.com {
 | Games list empty | A store JSON failed to load | Settings → Debug → Check library now |
 | Chat / VMs / AI do not connect | Their third-party backends are dead | Expected; the UI reports it instead of hanging |
 | Panic key does nothing | The panic toggle is off, or a letter key is being typed into a text box | Settings → Cloaking → enable it; letter keys (`z`, `q`) never fire while typing |
+| Stuck on the decoy page | A site loaded inside the decoy keeps the keyboard to itself, so `Esc` may not reach graip | Click the small "press Esc to go back" hint in the bottom-right corner |
+| Back from a panic goes to the Classroom disguise | You pressed the browser's Back button instead of `Esc` | `Esc` returns to where you were; Back is the browser's own history |
 | Every setting disappeared | Browser storage was cleared (school profile reset, private window) | Settings → Backup → restore your saved file |
 
 If none of that helps: **Settings → Debug → Export JSON** and attach the file to an issue. It contains
@@ -418,7 +421,7 @@ There is no build step and no package manifest.
 
 ```sh
 python3 -m http.server 8080     # serve the repo root
-node --test tests/*.test.js     # 106 tests, no dependencies, no network
+node --test tests/*.test.js     # 121 tests, no dependencies, no network
 ```
 
 Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md).
@@ -458,6 +461,8 @@ original code was written by x8r. Changes made in this fork:
 - **libcurl.js upgraded to 0.7.5** and `libcurl-transport` to 2.0.6 (updated CA store, new curl),
   with a load timeout and `libcurl_abort` handling instead of a silent hang
 - **Panic key + blackout decoy page** (`panic.html`), cloak profiles, auto-`about:blank`
+- **Panic returns to the exact place you left** — same page, same settings panel, same browser tabs —
+  instead of landing back on the Classroom disguise
 - **Exportable debug log** (verbose on by default) and a Debug settings panel
 - **Tab sessions restored after reload**, omnibox shortcuts and search bangs
 - **Mobile layout** (desktop unchanged)
@@ -467,7 +472,7 @@ original code was written by x8r. Changes made in this fork:
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader;
   shared scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`
 - Library hygiene: missing thumbnails get a placeholder and are reported
-- Added `tests/` (106 tests) and `AGENTS.md`
+- Added `tests/` (121 tests) and `AGENTS.md`
 
 Upstream: <https://github.com/x8rr/cherri>
 

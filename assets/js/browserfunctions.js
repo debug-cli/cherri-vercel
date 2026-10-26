@@ -1180,12 +1180,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (window.GraipCloak) {
     window.GraipCloak.installPanicKey();
-    // A panic replaces this document, so make sure the tab session does not
-    // survive it in sessionStorage.
+    // A panic replaces this document, but sessionStorage outlives the swap, so
+    // the tabs the user had open are still on disk. Keep them: returning from a
+    // panic used to wipe the session and reopen on one blank tab, which looked
+    // like a brand-new open. `pagehide` saved the session on the way out, so
+    // restoreTabSession() below brings it back where it was.
     if (sessionStorage.getItem("graip_panicReturn") === "1") {
       sessionStorage.removeItem("graip_panicReturn");
-      clearBrowserTraces();
-      graipLog.i("panic return: tabs were forgotten on purpose");
+      graipLog.i("panic return: tab session kept for the return");
     }
   }
 

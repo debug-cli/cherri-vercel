@@ -28,7 +28,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (107 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (121 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -96,8 +96,8 @@ second).
 
 ```
 .
-├── index.html                 1,654 lines  the whole app shell (markup + 36 script blocks)
-├── panic.html                  231        self-contained panic decoy
+├── index.html                 1,831 lines  the whole app shell (markup + 36 script blocks)
+├── panic.html                  328        self-contained panic decoy
 ├── newtab.html                  43 lines  new-tab stub
 ├── 404.html                    190        host 404 page (mini shell)
 ├── start.html                50878        byte-for-byte Google Classroom copy (the disguise)
@@ -133,7 +133,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  107 dependency-free tests
+└── tests/                     13 files  121 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -160,7 +160,7 @@ Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
 
 ## 3. The shell — `index.html`
 
-1,654 lines: 8 body containers, 8 settings panels, 4 drawers, **36 `<script>` blocks** (12 inline, 24
+1,831 lines: 8 body containers, 8 settings panels, 4 drawers, **36 `<script>` blocks** (12 inline, 24
 external). It is the app.
 
 ### 3.1 Body container map
@@ -209,14 +209,14 @@ target, and logs `panel <target>`. Deep link: `/?launch=1&settings=1&section=pro
 | 748–757 | `particlesJS.load` when `graip_particlesOn` is `yes` |
 | 760–912 | **Library loaders**: `gj(file)`, `load(file, type, fn, toRun, prefix)`, `noteLibraryIssue`, `showPlaceholder`, `applyThumb`, `observe` (IntersectionObserver), initial `load("apps"…)` + `load(selectedStore…)`, `storeUpdated` listener |
 | 914–1002 | `registerSW()`: registers `/uv/sw.js` then `/sw.js`, toasts, hides the spinner, enables `#homesearch` |
-| 1004–1012 | Address-bar Enter handler (`#searchbar` → `rSearch`) |
-| 1014–1022 | `load`: clears stale `.active` frames |
-| 1024–1248 | Drawer/settings machinery: `switchSettingsPage`, `toggleSettings/Apps/Games/Partners/DownloadGames`, `rSearch`, `searchApps` |
-| 1250–1263 | `#homesearch` Enter handler |
-| 1265–1306 | `updatePJS()` fog toggle (tears down/creates the Vanta effect) |
-| 1308–1329 | `updateOverlaySettings()` (`graip_useOverlay`) |
-| 1331–1498 | Version check (`graip_siteVersion`), `resetTheme()`, `openAB()`, `updateABSettings()`, `updateCLSettings()` (confirm-leave), `updateCur()` (cursor), two `beforeunload` guards, `DOMContentLoaded` deep-link handler |
-| 1500–1657 | Vanta effect (WebGL, guarded), visitor counter, `setWispStatus`, `setCurrentWispServer`, Wisp custom-input prefill, `setWisp`, `testWispServer` |
+| 1022–1030 | Address-bar Enter handler (`#searchbar` → `rSearch`) |
+| 1032–1040 | `load`: clears stale `.active` frames |
+| 1042–1425 | Drawer/settings machinery: `switchSettingsPage`, `toggleSettings/Apps/Games/Partners/DownloadGames`, `GraipShellState` (1237–1382), `rSearch`, `searchApps` |
+| 1426–1440 | `#homesearch` Enter handler |
+| 1445–1486 | `updatePJS()` fog toggle (tears down/creates the Vanta effect) |
+| 1487–1505 | `updateOverlaySettings()` (`graip_useOverlay`) |
+| 1507–1674 | Version check (`graip_siteVersion`), `resetTheme()`, `openAB()`, `updateABSettings()`, `updateCLSettings()` (confirm-leave), `updateCur()` (cursor), two `beforeunload` guards, `DOMContentLoaded` deep-link handler |
+| 1676–1831 | Vanta effect (WebGL, guarded), visitor counter, `setWispStatus`, `setCurrentWispServer`, Wisp custom-input prefill, `setWisp`, `testWispServer` |
 
 If you need to add shell behaviour, prefer a **new script block at the end** over editing an existing
 one: the blocks share the global scope, and a throw in an early block silently kills everything after
@@ -359,7 +359,10 @@ disguise on load (unless `<html data-graip-no-auto-cloak="1">`).
 | `blankDocument(name)` | `decoyMarkup` + a hidden "press Esc" escape hint that appears on pointer movement |
 | `targetUrl()` | Resolves the configured destination (including a validated custom URL) |
 | `matches(event)` | Key matching: `Shift+Z` needs shift, letter keys are ignored while typing or with modifiers |
-| `panic(options)` | The panic action: wipe tab session, open `decoyUrl(...)` in this tab or a new one |
+| `panic(options)` | The panic action: record the return point, open `decoyUrl(...)` in this tab or a new one |
+| `rememberReturnPoint()` | Stores `location.href` + a `GraipShellState.capture()` snapshot (see §12.2) |
+| `storedReturnUrl()` | The stored URL, but only when it is same-origin `http(s)` — never an open redirect |
+| `clearReturnPoint()` | Removes both return keys; the decoy calls it once it has used the URL, the shell after restoring |
 | `installPanicKey()` | One capture-phase `keydown` listener per page (`window.__graipPanicInstalled`) |
 | `openAboutBlank()` | Opens the current site in an `about:blank`-titled window and leaves a neutral tab behind |
 | `autoAboutBlank()` | Runs once per tab (`sessionStorage.graip_abOpened`), only at top level, and only when `graip_autoAB === "yes"` |
@@ -368,8 +371,9 @@ disguise on load (unless `<html data-graip-no-auto-cloak="1">`).
 
 Storage owned: `decoy`, `graip_cloakProfile`, `graip_cloakTitle`, `graip_cloakIcon`,
 `graip_panicEnabled`, `graip_panicKey`, `graip_panicTarget`, `graip_panicTargetUrl`,
-`graip_panicOpenIn`, `graip_panicShowDecoy`, `graip_autoAB`, plus `sessionStorage.graip_abOpened`
-and `sessionStorage.graip_panicReturn`.
+`graip_panicOpenIn`, `graip_panicShowDecoy`, `graip_autoAB`, plus `sessionStorage.graip_abOpened`,
+`graip_panicReturn`, `graip_panicReturnUrl`, `graip_panicReturnState` and (on panic only)
+`graip_skipLeaveGuard`.
 
 ### 5.3 `assets/js/wisp.js` — `window.GraipWisp` (779 lines)
 
@@ -594,15 +598,17 @@ Never write a `cherri_*` key.
 | Key | Purpose |
 | --- | --- |
 | `graip_tabs:<pathname>` | Tab session mirror (`browserfunctions.js`) |
-| `graip_panicReturn` | Set by a panic so the browser wipes the tab session on return |
+| `graip_panicReturn` | `"1"` after a same-tab panic; the browser page consumes it to log the return |
+| `graip_panicReturnUrl` | Where the decoy sends the tab back (`location.href` at panic time). Written by `panic()`, read once by `panic.html`, deleted on use |
+| `graip_panicReturnState` | JSON `GraipShellState.capture()` snapshot: frame src, drawer, settings panel, display flags, scroll. Deleted by `GraipShellState.resume()` |
 | `graip_abOpened` | Auto-about:blank has run once in this tab |
-| `graip_skipLeaveGuard` | One-shot: the settings importer's own reload must not trigger the leave prompt |
+| `graip_skipLeaveGuard` | One-shot: a deliberate reload (settings importer) or a panic must not trigger the leave prompt |
 
 ### 6.3 Service-worker caches
 
 | Cache | Contents | Invalidation |
 | --- | --- | --- |
-| `graip-shell-v1` | 27 same-origin shell assets (`SHELL_ASSETS`) | Bump `SHELL_CACHE`; `activate` deletes every `graip-shell-*` that does not match |
+| `graip-shell-v2` | 27 same-origin shell assets (`SHELL_ASSETS`) | Bump `SHELL_CACHE`; `activate` deletes every `graip-shell-*` that does not match |
 
 Proxy responses and cross-origin requests are never cached. Range requests bypass the cache entirely.
 
@@ -640,7 +646,7 @@ shell. `importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js")
 
 | Event | Behaviour |
 | --- | --- |
-| `install` | `skipWaiting()` immediately, then opens `graip-shell-v1` and `cache.add`s every `SHELL_ASSETS` entry individually (one failure must not fail the install) |
+| `install` | `skipWaiting()` immediately, then opens `graip-shell-v2` and `cache.add`s every `SHELL_ASSETS` entry individually (one failure must not fail the install) |
 | `activate` | Deletes stale `graip-shell-*` caches, then `clients.claim()` |
 
 Before this fork, the worker never called `skipWaiting()`, so a fix to this file (or to the blocklist)
@@ -841,9 +847,10 @@ keydown (capture, every page)
  ├─ matches(event)?  (enabled + key match + not typing + modifiers)
  ├─ preventDefault + stopPropagation
  └─ panic()
-     ├─ clearTabSession()                      (open tabs forget the session)
-     ├─ requestAnimationFrame ×2                (let any pending paint settle)
-     └─ openIn === "new-tab" ? openInNewTab() : location.assign(decoyUrl(...))
+     ├─ rememberReturnPoint()                  (location.href + GraipShellState.capture())
+     ├─ sessionStorage.graip_panicReturn = "1"
+     ├─ sessionStorage.graip_skipLeaveGuard = "1"   (a panic is not "leaving on purpose")
+     └─ openIn === "new-tab" ? openInNewTab() : location.replace(decoyUrl(...))
           decoyUrl = /panic.html?to=<dest>&cloak=<profile>[&plain=1]
 ```
 
@@ -856,7 +863,44 @@ keydown (capture, every page)
    decoy page.
 4. Calls `history.replaceState({}, "", "/panic.html")` **before** the target loads, so the destination
    never appears in the address bar or the back-button history.
-5. `Escape` returns to `sessionStorage.graip_panicReturn` (or a neutral site) and wipes the tab session.
+5. `Escape` **or the configured panic key** returns the tab to `sessionStorage.graip_panicReturnUrl`
+   with `location.replace` — see below. With no snapshot it falls back to a live `window.opener`
+   (focus + close) and then to `history.back()`.
+6. The key listener is registered capture-phase on `panic.html` **and**, for same-origin targets, on
+   the frame's own document (`frame.contentWindow.document.addEventListener`). A cross-origin target
+   keeps its key events, so `#hint` doubles as a click target; it only accepts pointer events once
+   `body.hint-on` is set, so it never intercepts clicks a user means for the site.
+
+#### Returning to the same place
+
+A same-tab panic *replaces* the document, so the tab keeps no memory of what it was showing. The old
+behaviour — `history.back()` — therefore landed on whatever preceded graip, which in practice is
+`/start.html`, the disguise the tab was opened from: a return looked like a brand-new open.
+
+The fix is a two-key snapshot written by `panic()` before the swap:
+
+| Key | Written by | Read by | Cleared by |
+| --- | --- | --- | --- |
+| `graip_panicReturnUrl` | `panic()` → `rememberReturnPoint()` | `panic.html` → `returnUrl()` via `GraipCloak.storedReturnUrl()` | the decoy, immediately before `location.replace` |
+| `graip_panicReturnState` | same, from `GraipShellState.capture()` | `index.html` → `GraipShellState.resume()` on `DOMContentLoaded` | `resume()` via `clearReturnPoint()` |
+
+`storedReturnUrl()` only returns a URL whose origin matches `location.origin` and whose protocol is
+`http`/`https`, so a stray `sessionStorage` write cannot turn the decoy into an open redirect.
+`location.replace` (not `assign`) is what keeps the tab's single history entry intact: Back from the
+restored tab still goes where it went before the panic.
+
+`GraipShellState` (in `index.html`) is the shell half:
+
+| Method | Behaviour |
+| --- | --- |
+| `capture()` | `{ view, frameSrc, frameInBody, frameDisplay, homeDisplay, navDisplay, navOpacity, homeBtnDisplay, drawer, panel, scrollY, at }` — inline styles only, so it describes what is on screen rather than re-deriving `navTo()`'s rules |
+| `restore(state)` | Replays the snapshot: puts the frame back (re-setting `src` reloads the page, which is what restores a browser tab session), shows the page or home, re-opens the sheet/drawer via the same `toggleX()` functions, re-selects the settings panel |
+| `resume()` | Reads `graip_panicReturnState`, always clears the snapshot first, restores, and logs `returned to graip` |
+
+`resume()` is registered last (the module lives in the final `defer` block), so the deep-link handler
+(`?launch=1&page=…&settings=1&section=…`) runs first and the snapshot has the final word. The browser
+page no longer wipes its tab session on return: `pagehide` saved it on the way out and
+`restoreTabSession()` now brings it back.
 
 Nothing from graip may ever be visible on that page. It loads only `log.js` and `cloak.js` (for
 `safeUrl`/`blankDocument`) and sets `data-graip-no-auto-cloak="1"` so `cloak.js` does not overwrite its
@@ -948,7 +992,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 107 tests, ~4 s, no dependencies, no network
+node --test tests/*.test.js        # 121 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -962,8 +1006,8 @@ node --test tests/*.test.js        # 107 tests, ~4 s, no dependencies, no networ
 | `browser-recovery.test.js` | 2 | Route recovery path |
 | `browser-tab-navigation.test.js` | 1 | `go()`/`nav()` wiring and failure branch |
 | `page-bootstrap.test.js` | 11 | Every page boots with missing DOM/globals |
-| `site-wiring.test.js` | 9 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure and no duplicate `<script src>` |
-| `panic-log.test.js` | 19 | Log filtering/redaction, panic matching/navigation, panic page structure, cloak profiles, tab restore, omnibox |
+| `site-wiring.test.js` | 10 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure, no duplicate `<script src>`, release version |
+| `panic-log.test.js` | 32 | Log filtering/redaction, panic matching/navigation, decoy structure, the return path (`returnUrl`/`leave` run against a fake document), `GraipShellState` capture/restore/resume, cloak profiles, tab restore, omnibox |
 | `mobile-pwa.test.js` | 10 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
 | `settings-io.test.js` | 28 | Allowlist, validation, partial imports, reset, failure paths, panel wiring |
 
@@ -1000,7 +1044,7 @@ What the project actually promises, and where each promise is implemented:
 | --- | --- | --- |
 | Query strings are never recorded | `GraipLog.safeUrl()` strips query + fragment; `describeRequest()` in `sw.js` does the same | A new log call passing a raw `location.href` |
 | TLS verification is never disabled | The libcurl bundle keeps peer verification; curl 60 is surfaced, not bypassed | Editing the WASM/CA bundle or the transport flags |
-| A panic leaves no destination behind | `history.replaceState` in `panic.html`, `clearTabSession()`, `scrubDocumentUrl()` | Storing the URL elsewhere (do not) |
+| A panic leaves no destination behind | `history.replaceState` in `panic.html`, `scrubDocumentUrl()`; the return point lives in `sessionStorage` and never reaches the address bar | Writing the destination anywhere persistent (do not) |
 | A config file cannot inject code | `settings-io.js` type validation (`url`/`wisp`/`token` regexes) | Assigning imported values to `href`/`src` without validation |
 | Cloaking does not leak the real title | `cloak.js` sets title/icon on load; `panic.html` opts out of auto-cloak | A page that overrides `document.title` after load |
 | Proxied traffic is never cached | `sw.js` `isProxyPath()` guard | Adding a cache-first branch for `/~/sj/` |
@@ -1015,7 +1059,7 @@ still a record of *what the user did* (not where) — treat an exported log as p
 
 ## 17. Performance notes
 
-- **Shell payload**: `index.html` 1,654 lines (83 KB) + `styles/index.css` (1,763 lines, 34 KB) + ~9
+- **Shell payload**: `index.html` 1,831 lines (92 KB) + `styles/index.css` (1,763 lines, 34 KB) + ~9
   first-party scripts.
   `assets/js/lib/three.min.js` (26,887 lines) and `vanta.fog.min.js` are the heaviest first-party
   downloads and are only on `index.html`; the fog toggle exists to let users drop them.
@@ -1215,7 +1259,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 107/107, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 121/121, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1238,6 +1282,10 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
 - TLS failures classified and retried (curl 7/35/60) with explanations; verification stays on.
 - libcurl.js 0.7.5 + libcurl-transport 2.0.6, with a load timeout and `libcurl_abort` handling.
 - Panic key + blackout decoy page (`panic.html`), cloak profiles, auto-`about:blank`.
+- Panic return point: the decoy reopens graip at the exact URL, page, drawer and settings panel the
+  user left, instead of falling through to `/start.html` via `history.back()`.
+- Release stamp `v2.0.0 "juice"`: `<graipattr version>` in `index.html` (drives the update toast),
+  the settings footer, the Updates panel and `SHELL_CACHE = graip-shell-v2`.
 - Exportable debug log (verbose on by default) and Debug/Backup settings panels.
 - Tab sessions restored after reload; omnibox shortcuts and bangs.
 - Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.
@@ -1246,7 +1294,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (107 tests) and this handbook.
+- Added `tests/` (121 tests) and this handbook.
 
 ---
 
@@ -1259,7 +1307,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 107 pass
+node --test tests/*.test.js | tail -3                              # 121 pass
 git ls-files | wc -l                                               # 8401
 ```
 

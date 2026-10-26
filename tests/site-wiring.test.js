@@ -220,3 +220,32 @@ test("the shell document head is well formed and does not load anything twice", 
     assert.deepEqual(dupes, [], `${page} loads the same script more than once: ${dupes.join(", ")}`);
   }
 });
+
+test("the release version is 2.0.0 \"juice\" everywhere it is written", () => {
+  const home = read("index.html");
+
+  // one stamp drives the update toast, two places show it to a human
+  assert.match(
+    home,
+    /<graipattr version="s2\.0\.0"><\/graipattr>/,
+    "the site version stamp must be s2.0.0"
+  );
+  assert.match(home, /v2\.0\.0 (?:&ldquo;|“)juice(?:&rdquo;|”)<\/a>/, "the settings footer shows the release");
+  assert.match(home, /What's New in v2\.0\.0 (?:&ldquo;|“)juice(?:&rdquo;|”)/, "the Updates panel names it");
+
+  // no first-party file may still advertise the old release
+  const files = ["index.html", "404.html", "newtab.html", "panic.html", "manifest.json", "README.md", "AGENTS.md"]
+    .concat(fs.readdirSync(path.join(ROOT, "pages")).filter((f) => f.endsWith(".html")).map((f) => `pages/${f}`))
+    .concat(fs.readdirSync(path.join(ROOT, "assets/js")).filter((f) => f.endsWith(".js")).map((f) => `assets/js/${f}`))
+    .concat(["sw.js"]);
+
+  const stale = [];
+  for (const file of files) {
+    const source = read(file);
+    if (/\bs1\.\d+\.\d+\b|\bv1\.1\.1\b|Release 1\.1\.1/.test(source)) stale.push(file);
+  }
+  assert.deepEqual(stale, [], `still advertising the old version: ${stale.join(", ")}`);
+
+  // the shell cache name carries the release so a new build retires the old one
+  assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v2";/);
+});
