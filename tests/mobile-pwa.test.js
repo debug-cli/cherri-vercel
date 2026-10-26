@@ -321,6 +321,7 @@ test("mobile home search icon sits inline with the placeholder and nav logo is c
   const css = read("styles/index.css");
   const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
   assert.match(phoneRules, /\.searchathome\s*\{[^}]*display:\s*flex/);
+  assert.match(phoneRules, /\.searchathome\s*\{[^}]*margin-inline:\s*auto/);
   assert.match(phoneRules, /#homesearch\s*\{[^}]*flex:\s*1 1 auto/);
   assert.match(phoneRules, /nav ul li:first-child a\s*\{[^}]*margin:\s*0 !important/);
   assert.match(phoneRules, /nav ul li:first-child img\s*\{[^}]*margin:\s*0 !important/);

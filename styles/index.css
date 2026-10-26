@@ -1748,6 +1748,7 @@ span.online-count {
         align-items: center;
         gap: 10px;
         width: min(92vw, 355px);
+        margin-inline: auto;
         padding: 0 14px;
     }
 
