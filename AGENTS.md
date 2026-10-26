@@ -1,647 +1,1267 @@
-# Agent Notes
+# graip — engineering handbook
 
-Everything about this repository that is not obvious from reading one file.
+This is the deep reference for **anyone changing this repository**: full-time developers, drive-by
+contributors, and coding agents. It assumes you can read JavaScript, service workers and HTML. If you
+are looking for "what is this site and why should I use it", that lives in [`README.md`](README.md).
 
-It has three audiences, in this order:
-
-1. **Someone who does not write code** and wants to know what graip is, why it is worth using as
-   their everyday proxy, and what to click when something breaks — [Part 1](#part-1--for-people-who-do-not-write-code).
-2. **Someone who does write code** and needs a map of every file before touching one —
-   [Part 2](#part-2--for-people-who-do-write-code).
-3. **An AI/agent** doing either of the above: the rules in
-   [Known traps](#known-traps) and [Sweep findings](#repo-sweep) are hard-won. Read them last, obey
-   them always.
-
-Scale of the repository, so nothing here is a surprise: **8,401 tracked files, ~2.7 GB**, of which
-roughly **120 are first-party**. `stores/` alone is 7,026 files / 2.5 GB of vendored games, `fa/` is
-409 files of icon fonts, `assets/img/` is 811 images. Everything else — the actual site — is small
-enough to read end to end in an afternoon.
+Nothing here is aspirational. Every claim was checked against the files at the commit that added it,
+and the counts are reproducible with the commands in [Verifying this document](#verifying-this-document).
 
 ---
 
-# Part 1 — For people who do not write code
+## 0. How to use this document
 
-## What graip is, in one paragraph
-
-graip is a website. You open it, and it gives you three things in one place: a **proxy browser**
-(type a blocked site's address, read or use it inside graip), a big **games library** (575 games at
-the time of writing, playable in the tab, no downloads), and a **movie/TV browser** (search films and
-episodes, press play, they stream in a frame). Around that there are apps shortcuts, a small AI chat,
-wallpaper-style themes, and a set of privacy features built for a school laptop: a **panic key** that
-swaps the whole tab for a fake Classroom page, a **fake tab title and icon**, and an installable
-"app" mode that keeps working even when the network starts filtering things.
-
-It is one folder of files with no server of its own (a "static site"). You can use somebody else's
-copy, or put your own copy online for free in about five minutes — see the buttons in `README.md`.
-
-## Why make it your main
-
-Not because it is the only proxy site — there are hundreds. Because it is the one that behaves like a
-product instead of a demo:
-
-- **One address does everything.** Most sites give you a proxy *or* a games page *or* a movie site,
-  then send you to a different domain for each. Here the browser, the games, the apps and the movies
-  are tabs in the same app, so you bookmark one thing and stay in it. Your open browser tabs survive
-  a reload — the same way a real browser's do — so an accidental F5 does not throw away the page you
-  were on.
-- **It answers the questions teachers ask.** The tab title and icon can claim to be Google Docs or
-  Classroom; one key (backslash by default) turns the tab into a page that looks like schoolwork for
-  the half-second a teacher is looking, then either replaces the tab or moves you to a neutral site.
-  While that decoy loads you see a plain **black screen**, not a flash of the proxy — the detail other
-  "panic buttons" get wrong. Nothing about your tabs is left in the address bar or in storage
-  afterwards.
-- **It works when the network gets worse.** Every other proxy site is a blank page the moment the
-  filter starts blocking it. graip registers a service worker, so the shell (menus, settings, the
-  proxy's own UI) is cached on your device: on a filtered or offline network the UI still boots and
-  tells you which Wisp route is down instead of showing a browser error page. You can also install it
-  as an app (browser menu → Install / Add to Home Screen), which is what most people actually want on
-  a Chromebook.
-- **It does not lie to you when something is broken.** Every action, every proxy request, every
-  failed thumbnail and every error is recorded in a **debug log** you can export as a file from
-  Settings → Debug. When a site will not load, the log says whether the route was down, TLS was
-  intercepted, or the destination itself refused — and you can hand that file to whoever maintains
-  your copy instead of describing a blank screen. Several of the built-in features are honest about
-  being dead (the chat, VM and AI pages depend on third-party services that no longer answer) and now
-  say so on screen rather than spinning forever.
-- **Your settings are yours.** No account, no sign-in, no analytics of what you browse (the debug log
-  strips query strings before it stores anything). Preferences live in your own browser and can be
-  saved to a file and restored on another machine — useful on school machines that wipe profiles, and
-  useful for setting up a friend.
-- **It is maintained like software.** There are 106 automated tests, a documented layout, a changelog
-  of what the fork fixed, and a licence that keeps it open (AGPL-3.0). That is why a bug you report
-  can actually be fixed, which is not true of a site whose repository is a screenshot and a Discord
-  invite.
-- **You are not stuck with someone else's copy.** Deploy it yourself (Vercel, Netlify, Cloudflare
-  Pages, GitHub Pages, Render, Railway, Replit, Glitch — `README.md` has buttons), or run it locally
-  with one command. A copy you host is a copy nobody can quietly take down.
-
-## What it is *not* — read this before complaining
-
-This document would be useless if it sold you something the code cannot do:
-
-- **A proxy needs a route out.** graip proxies through a public **Wisp** server. If your school
-  blocks WebSockets altogether, nothing client-side can fix it — the browser page will tell you so.
-  You can also host your own route (see `README.md` → self-hosting a Wisp server); that is the only
-  real answer on a hostile network.
-- **Public Wisp endpoints are donated, not guaranteed.** They are community servers. They go down,
-  rate-limit, or disappear. graip tests them, falls back automatically, and shows you which one
-  answered, but it cannot make somebody else's server reliable.
-- **It is not invisible.** A determined administrator who logs DNS or sees a websocket to an unknown
-  host can tell something is happening. The cloaking features protect against a glance and against a
-  browser-history check, not against a packet-level audit.
-- **Some sites will still fail.** Certificate errors (error 60) come from the destination's chain,
-  your clock, or a filter intercepting TLS. graip refuses to disable certificate checking to "fix"
-  that, because doing so would put your logins at risk.
-- **The chat, VM and AI pages depend on third parties.** Chat needs an external socket server (dead
-  at the time of writing, and it says so), VMs embed browser.lol, and the AI talks to
-  pollinations.ai. Games, apps, movies and the browser are the parts that do not depend on anyone.
-- **Movies are streams from third-party embed sites.** They are not hosted here, quality varies, and
-  the metadata comes from TMDb, which needs a live connection.
-- **The site counts its own page views.** `index.html` loads an Umami analytics tag, and tries a
-  first-party visitor counter whose endpoint is dead. That is site traffic, not a record of what you
-  browse — but if you host your own copy and want neither, delete that tag and the dead counter
-  block.
-
-## First five minutes
-
-1. Open the site **with `?launch=1`** on the end of the address (`https://your-site/?launch=1`).
-   Without it you land on `start.html`, which is a deliberately dull Google Classroom lookalike — the
-   disguise, not the app. The `/` of a deployed copy redirects there on purpose.
-2. Press the **gear** in the sidebar → **Proxy**. Press *Test current server*. If it fails, pick
-   another route in the list and test again; the test only proves the route answered, not that every
-   site will load through it.
-3. Go to **Cloaking**. Choose a *Tab Cloak* (the title + icon your tab will claim), turn on **Auto
-   about:blank** if you want the site to live in a `about:blank` tab, and set up the **Panic key**:
-   pick the key, the destination (Classroom by default) and whether it replaces this tab. Press *Test
-   panic now* once so you know what it does before you need it.
-4. Go to **Backup** and press *Save settings file*. Keep it. School machines wipe browser storage.
-5. Optional: browser menu → **Install app** (Chrome/Edge/Chromebook) so graip opens like a normal
-   application and keeps its offline shell.
-
-### Keyboard, in one table
-
-| Keys | What happens |
+| If you are… | Read |
 | --- | --- |
-| `Ctrl/Cmd + L` | Focus the address bar |
-| `Ctrl/Cmd + T` | New tab |
-| `Ctrl/Cmd + W` | Close this tab |
-| `Ctrl + Tab` | Next tab |
-| `Ctrl/Cmd + Shift + T` | Reopen the last closed tab |
-| `Alt + ←` / `Alt + →` | Back / forward |
-| `!g cats`, `!ddg cats`, `!b`, `!yt`, `!w`, `!gh`, `!r` | Search a specific site from the address bar |
-| Panic key (default `\`) | Panic: decoy page, then your destination |
+| Opening the repo for the first time | §1 mental model, §2 map, §3 shell |
+| Touching the proxy | §8 service worker, §9 proxy stack, §10 Wisp contract |
+| Touching settings or storage | §6 storage reference, §7 events, §11 settings format |
+| Touching cloaking, panic or tabs | §12 cloaking, §5.5 tab engine |
+| Chasing a bug | §20 debugging cookbook, §22 traps, §23 sweep findings |
+| Adding a feature | §21 conventions, §24 playbooks, then the relevant subsystem |
+| Reviewing a PR | §25 invariants checklist |
 
-Typing something with a dot in it goes to that site; anything else becomes a search with your chosen
-search engine.
+**Hard rules that no section overrides** — if you only remember four things:
 
-## When something breaks
-
-| What you see | What to do |
-| --- | --- |
-| A site spins forever | Settings → Proxy → test another route. The debug log (Settings → Debug) names the failure. |
-| "error code 60" | That site's certificate is being rejected. Try another route once; if it persists, it is the destination or TLS interception, not graip. |
-| Games list empty | Reload. If it stays empty, Settings → Debug → *Check library now* reports the JSON/thumbnail problems. |
-| Blank page after a deploy | You deployed to a subfolder, or `sw.js` is not at the root. Deploy at the domain root. |
-| Redirected to a Classroom lookalike | That is `start.html`. Add `?launch=1`. |
-| Everything is gone | Settings → Backup → restore your saved file. It reloads the page on purpose. |
-
-If you are going to ask for help, Settings → **Debug → Export JSON** first. That file contains the
-answers (and no query strings, so no search terms).
+1. No build step, no package manifest, no bundler, no framework. Every tracked file is served as-is.
+2. `stores/`, `fa/`, `assets/icons/`, `homework/`, `uv/`, `baremux/`, `libcurl/` and `assets/js/lib/`
+   are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
+3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
+   feature still loads the file.
+4. `node --test tests/*.test.js` stays green (107 tests). Nothing else is required to verify a change,
+   and nothing else may be added to the repo to verify one.
 
 ---
 
-# Part 2 — For people who do write code
+## 1. Mental model
 
-## The 60-second orientation
+graip is a **static site that proxies by running a proxy inside the user's browser tab**. There is no
+server component in this repository: the host only serves bytes. That single fact explains almost
+every design decision in the codebase.
 
-- **No build step, no package manifest.** Every tracked file is served as-is. Edit what ships. No
-  bundler, no npm dependency, no TypeScript.
-- **The whole app is `index.html`** (1,646 lines: markup + most of the site's inline JS) plus
-  `pages/*.html` loaded into an iframe, plus `assets/js/*.js` which is plain browser JS.
-- **Proxy runtime is vendored** under `homework/` (Scramjet), `uv/` (Ultraviolet),
-  `baremux/` (transport plumbing), `libcurl/` (WASM curl) and `sw.js` (the service worker).
-- **Tests are `node --test tests/*.test.js`** — 13 files, 106 tests, no dependencies, no network.
-  That is the only supported command.
-- **Deployment is a static host** (Vercel by default, `vercel.json` holds headers only). No
-  server-side routes and **no `/wisp/` endpoint on this origin** unless a deployment adds one.
-
-## Every file, explained
-
-### Root
-
-| File | Lines | What it is |
-| --- | --- | --- |
-| `index.html` | 1,646 | The app shell: sidebar nav, tab strip, address bar, apps/games/partners/download drawers, the eight settings panels, the library loaders, `navTo()`, the visitor counter, theme and panic wiring. 37 `<script>` blocks, most of the site's behaviour. |
-| `panic.html` | 231 | Self-contained panic decoy. Black screen → decoy page inside a frame → reveals only after the target loads. Loads only `log.js` and `cloak.js`. No CDN, no CSS from the site, so it works on a dead network. |
-| `newtab.html` | 44 | The tiny "hi! try searching" page every new browser tab opens. |
-| `404.html` | 190 | Host 404 page: "not found", a link home, a `#contentFrame`, toasts and both service-worker registrations. Its `navTo()`/`rSearch()`/toast JS is inherited from the old shell and mostly unreachable (there is no `#homesearch` input and no nav), but it must keep pointing at real pages. |
-| `start.html` | 50,878 | A byte-for-byte saved copy of a Google Classroom page. It is the disguise the bare domain shows; its links are decoration and every test excludes it. **Never reformat it, never "fix" its markup, do not add it to test page lists.** |
-| `sw.js` | 651 | Scramjet's service worker plus this fork's additions: immediate `skipWaiting`/`claim`, proxy-error classification, the ad blocklist, the offline shell cache, and debug-log reporting to the page. |
-| `manifest.json` | 49 | PWA manifest: standalone, `/?launch=1` start URL, SVG + 160×160 PNG icons, three shortcuts (browser/games/movies). |
-| `vercel.json` | 29 | Headers only: manifest MIME type, `sw.js` no-cache + `Service-Worker-Allowed: /`, one-week cache on `/assets/*`, `nosniff`, `no-referrer`. No build, no rewrites. |
-| `README.md` | — | The public document: features, how it differs from other proxies, deploy buttons per host, Wisp self-hosting, troubleshooting, credits to x8r, FORK NOTICE. |
-| `AGENTS.md` | this file | Layout, contracts, traps. Update it when behaviour changes. |
-| `MOVING.md` | 12 | Legacy stub of the old readme (fork notice + the Cloudflare asset-limit note). Not linked from the site; `README.md` supersedes it. |
-| `LICENSE` | — | GNU AGPL-3.0. Forking and hosting is fine; publishing a modified version means publishing the source. Keep it. |
-| `.gitignore` | 41 | Ignores build output (none exists), `node_modules`, `.env`, JetBrains/Netlify folders, and the private `KEYS.json` / `graip-*-worker` folders the upstream author used. |
-| `.github/workflows/sync-fork.yml` | 21 | Nightly `gh repo sync` of the **default branch** from the upstream parent, plus manual dispatch. It is destructive to `main`: never do fork work on the default branch. |
-| `docs/superpowers/plans/2026-10-03-curl-60-wisp-scramjet-diagnosis.md` | — | The investigation plan that produced the TLS error classification and the Wisp probe tests. Historical: it names libcurl 0.7.1, the repo now ships 0.7.5. Useful as design rationale, not as current state. |
-
-### `pages/` — what `navTo()` and the drawers load into `#contentFrame`
-
-| File | Lines | What it is |
-| --- | --- | --- |
-| `browser.html` | 328 | The main proxied browser: tab strip, address bar, back/forward/reload, fullscreen, Eruda console, home button. Boots the Scramjet controller. |
-| `browser-minimum.html` | 353 | Same browser without the floating logo/side menu; used where the chrome would be in the way. |
-| `embed.html` | 360 | Browser page meant to be embedded by other pages (VMs, games that open a proxied URL). Reads `?launch=` and navigates once. |
-| `play.html` | 507 | Game player: an iframe for a `/stores/…` game plus the overlay (session timer, clock/temperature, recording buttons, download). |
-| `games.html` | 343 | The Games drawer as a standalone page (search + tiles) for linking from outside the shell. |
-| `apps.html` | 327 | Same for the app shortcuts list. |
-| `partners.html` | 295 | Partner sites list (two entries). |
-| `movies.html` | 214 | TMDb search/browse grid. |
-| `watch.html` | 510 | TMDb detail page: seasons/episodes, and a player that embeds third-party stream providers (pstream.mov, multiembed.mov, vidsrc). |
-| `movieframe.html` | 154 | Legacy wrapper that embeds `movies.html` full-screen with its own top nav. |
-| `assistant.html` | 467 | The "AI" page: prompt box, markdown/KaTeX/highlight rendering from CDNs, text and image generation against pollinations.ai. |
-| `vms.html` | 144 | VM page: embeds `/pages/embed.html?launch=https://browser.lol/create` (a VM reached through the proxy). |
-| `chatrooms.html` | 3,196 | Socket.io chat UI (emoji-mart, dev-tunnel backend). Degrades to a visible "chat unavailable" notice when the client or server is missing. |
-| `gmbl.html` | 220 | A joke slot-machine page (`party-js`). Its nav entry is commented out in `index.html`; it is reachable only by URL. |
-| `classroom.html` | 37,761 | A second saved Classroom copy, older and unused by any page or nav item. Tests exclude it. Leave it alone or delete it deliberately, but do not wire it up. |
-
-### `assets/js/` — first-party JavaScript (19 files including `lib/`)
-
-| File | Lines | Responsibility |
-| --- | --- | --- |
-| `log.js` | 547 | `window.GraipLog`. Installs global capture (errors, rejections, `console.warn/error`, `fetch`, service-worker reports) and records actions. Owns `graip_debugLog`, `graip_verboseLogs`. **Loaded first on every page.** |
-| `cloak.js` | 607 | `window.GraipCloak`. Nine disguise profiles (title + icon + decoy page), nine panic destinations, eight panic keys, the `about:blank` window, and the decoy document builder. Owns `decoy`, `graip_cloak*`, `graip_panic*`, `graip_autoAB`. |
-| `browserfunctions.js` | 1,199 | The browser engine: tab model (`bTabs`), `newTab/switchTab/closeTab/nav/go`, Scramjet controller + libcurl transport bootstrap, Ultraviolet fallback, route recovery, tab-session persistence, URL scrubbing, omnibox shortcuts and bangs. |
-| `wisp.js` | 779 | `window.GraipWisp`. 30 endpoints, URL normalisation, real Wisp handshake probing, pooled failover, `configureTransport()`, curl error classification. |
-| `settings-io.js` | 831 | `window.GraipSettings`. Backend-free settings backup: `SCHEMA` allowlist, per-type validation, export/import/preview/reset, the Backup panel wiring. |
-| `debug-panel.js` | 456 | Settings wiring for Debug + Panic panels: clones an existing `.switch` into `.graip-toggle-slot` placeholders, renders panic controls, `GraipCheckLibrary`, `GraipProbeAll`. |
-| `dropdown.js` | 429 | The custom dropdown widgets (Wisp, backend, search engine, game store, theme, cloak) and their storage keys. Must load after `wisp.js` and `cloak.js`. |
-| `settings.js` | 216 | Legacy settings helpers (`cloakMe`, `applyTheme`, wisp status text). **Also included by 96 vendored pages under `stores/`** that have no settings UI, so every lookup must stay optional. |
-| `proxy-errors.js` | 84 | `GraipProxyErrors`: turns curl exit codes (7/35/60/…) and libcurl messages into one classifier used by both the page and `sw.js`. |
-| `colors.js` | 12 | Applies the saved theme to `#css-theme-link` before first paint. Must tolerate pages without that element. |
-| `t.js` | 146 | `showToast(type, message, iconClass)` and the toast stack. |
-| `cursor.js` | 115 | The ZXS-style custom cursor; reads `graip_customCursor`, cleans up its listeners when disabled. |
-| `splash.js` | 88 | The rotating homepage splash phrases. |
-| `vm.js` | 118 | Legacy Hyperbeam VM launcher with a 20-minute cooldown. Loaded by `vms.html` and `assistant.html`, whose UI is an iframe instead — so it no-ops by design. |
-| `chatrooms.js` | 129 | CometChat client (token via `api.x8r.dev`). **Not loaded by any page** — `chatrooms.html` implements its own socket.io chat. Dead code kept for reference. |
-| `lib/particles.js` | 963 | Vendored particles.js (background dots). Loaded by 10 pages. |
-| `lib/three.min.js` | 26,887 | Vendored three.js, required by Vanta. Loaded only by `index.html`. |
-| `lib/vanta.fog.min.js` | 440 | Vendored Vanta fog effect. Loaded only by `index.html`. |
-| `lib/detectmobile.js` | 35 | UA sniffing helper (`isMobile()`); used only by a few vendored GN-Math pages, not by first-party pages. |
-
-### `assets/css/` and `styles/`
-
-| File | Lines | What it is |
-| --- | --- | --- |
-| `styles/index.css` | 1,763 | The app shell: nav, tabs, address bar, drawers, settings sheet, toasts, library tiles, plus the **media-query-only** mobile block at the end. |
-| `assets/css/colors.css` | 18 | Default palette (13 CSS variables on `:root`: `--bg`…`--accent-2`). Loaded everywhere as `#css-theme-link`. |
-| `assets/css/themes/*.css` | 16 | One file per theme: `coral.css`, `dunes.css`, `ember.css`, `forest.css`, `golden.css`, `lavendar.css`, `lime.css`, `magenta.css`, `midnight.css`, `mint.css`, `neon.css`, `ocean.css`, `royal blue.css` (note the space), `sea.css`, `violet.css`, `void.css`. Same variable names as `colors.css`. |
-| `assets/css/elements.css` | 344 | Shared layout for the standalone pages (grids, bottom nav, custom select, fonts). |
-| `assets/css/dropdown.css` | 137 | The `.x-selector` widgets used by settings. |
-| `assets/css/font.css` | 151 | 24 `@font-face` rules for the bundled fonts (figtree, funnel, geist, gg sans, google sans, inter, interotf, jakarta, lexend, manrope, onest, quicksand, rubik, sfc, sora, space grotesk). |
-| `assets/css/t.css` | 55 | Toast container/animation. |
-| `assets/css/overlay.css` | 154 | The in-game overlay (recording widget, session timer, info panel). |
-| `assets/css/ai-elements.css` | 32 | Chat bubbles for the AI page. |
-| `assets/css/cursor.css` | 47 | Custom cursor visuals. |
-| `assets/css/mobile.css` | 142 | Small-screen rules. **Only inside `@media (max-width: 640px)`** — the test suite fails if a top-level rule appears. |
-
-### Data, images, fonts, icons
-
-| Path | Contents |
-| --- | --- |
-| `assets/json/classplay.json` | 97 game entries (`name`, `url`, `img`) for the Classplay/UCP store. |
-| `assets/json/gn-math.json` | 478 game entries for the GN-Math store. |
-| `assets/json/apps.json` | 30 app shortcuts (external sites + a local icon). |
-| `assets/json/partners.json` | 2 partner entries. **Known inconsistency:** both point at `prism.onl`; the Hydra entry has its own `hydra.png` but reuses `prism.png`. |
-| `assets/json/config/particles.json` | particles.js config for the pages that enable the dotted background. |
-| `assets/img/games/` | 119 PNG thumbnails plus `gn-math/` with 622 more (one per GN-Math entry). |
-| `assets/img/apps/` | 50 icons; 29 are referenced by `apps.json` (the rest are spares). |
-| `assets/img/cloaks/` | 8 disguise favicons (gclassroom, gdrive, google, gmail, edpuzzle, iready, blooket, kahoot). |
-| `assets/img/partners/` | `prism.png`, `hydra.png`. |
-| `assets/img/fav.png`, `fav.svg`, `cover.png`, `s.png`, `c-down.png` | App icon (160×160 PNG + SVG), social cover, and two small UI sprites. `cover.png` is only referenced by the stale `og:image` meta — see sweep findings. |
-| `assets/fonts/` | 16 TTFs/OTFs plus `gg-sans/` (4 weights) and `sfc/` (6 SF Compact weights). `googlesans.ttf` alone is 4 MB. |
-| `assets/icons/fonts/` | Remix Icon 4.7.0: `remixicon.css` (linked as `/assets/icons/fonts/remixicon.css`), woff2/ttf/eot, glyph JSON, and the vendor's own `index.html`/`symbol.html`/`unicode.html` demo pages — ~1 MB of HTML that is not part of the site. |
-| `fa/` | Font Awesome **Free 7.1.0**: 21 CSS files in `fa/css/` and 388 webfont files. Pages load `all.css`, `all.min.css`, `solid.css` and `all-pro.css`; only the free glyph set is present, so Pro-only names (e.g. `fa-hood-cloak`, `fa-cog`) render nothing. |
-
-### Proxy runtime (vendored — read, never edit)
-
-| Path | What it is |
-| --- | --- |
-| `homework/math.all.js` (227 KB + 800 KB map) | Scramjet's client bundle (`$scramjet`, main world + injected world). Disguised filename is load-bearing. |
-| `homework/science.sync.js` | Scramjet's controller **page-side** half (`$scramjetController`). |
-| `homework/chemistry.sw.js` | Scramjet's controller **service-worker** half, imported by `sw.js`. |
-| `homework/english.bundle.js` | Scramjet controller bundle (reports `0.0.14`) loaded by the browser pages; exposes `$scramjetController.Controller`. |
-| `homework/history.wasm.wasm` | The 585 KB WebAssembly payload the controller loads. |
-| `homework/*.js.map` | Four source maps (`chemistry.sw.js.map`, `english.bundle.js.map`, `math.all.js.map`, `science.sync.js.map`, 0.9 MB total). Never fetched by the site; they exist so a stack trace from a proxied page can be read. Harmless to ship, and the only way to debug the bundles. |
-| `uv/uv.bundle.js`, `uv/uv.client.js`, `uv/uv.handler.js`, `uv/uv.sw.js` | Ultraviolet 3.2.10 (build 92d9075), the legacy backend. |
-| `uv/uv.config.js` | UV config: prefix `/uv/service/`, XOR URL codec, script paths. |
-| `uv/sw.js` | The UV service-worker entry (`importScripts` the bundle, config and `uv.sw.js`). |
-| `baremux/index.js`, `index.mjs`, `worker.js` | bare-mux v2.1.7 (build c56d286): the MessagePort plumbing between page, worker and transport. |
-| `libcurl/index.js`, `index.mjs`, `index.cjs` | libcurl.js 0.7.5 + `@mercuryworkshop/libcurl-transport` 2.0.6, WASM embedded as base64. |
-| `libcurl/libcurl.mjs` | 11-line ES re-export so bare-mux and the Scramjet controller share one copy of the bundle. |
-| `sw.js` (root) | The service worker that actually ships: Scramjet + error pages + blocklist + shell cache. |
-
-### `stores/` (7,026 files, 2.5 GB — third-party game data)
-
-| Path | What it is |
-| --- | --- |
-| `stores/ucp-games/` | 6,402 files, 54 game folders (Unity/WebGL builds, HTML5 games, a 49 MB single-file `html/gd.html`, 70 MB `owt2/index.pck`). Each folder is an upstream drop; `README.md` inside says "Game stash for Classplay". |
-| `stores/gn-math/` | 624 single-file HTML games (`0.html`…), referenced by `assets/json/gn-math.json`. |
-
-Both are served as plain static files and opened either directly in `#contentFrame` or through
-`pages/play.html`. Do not reformat, minify, lint or "clean up" anything in here, and keep diffs
-mechanical.
-
-### `tests/` — 13 files, 106 tests, `node --test`
-
-| File | Tests | Covers |
-| --- | --- | --- |
-| `wisp.test.js` | 5 | URL normalisation, preset lookup, handshake probing. |
-| `wisp-selection.test.js` | 7 | Chosen endpoint survives failover, fallback labelling, custom URLs. |
-| `proxy-errors.test.js` | 3 | curl code → user-facing message classification. |
-| `scramjet-errors.test.js` | 4 | `sw.js` transport error page and proxy-vs-origin failures. |
-| `service-worker-control.test.js` | 2 | `skipWaiting`/`clients.claim` and controller readiness. |
-| `libcurl-bundle.test.js` | 6 | WASM magic in the bundle, load timeout, abort path, no TLS downgrade. |
-| `browser-recovery.test.js` | 2 | Route recovery and the "try another route" path. |
-| `browser-tab-navigation.test.js` | 1 | `go()`/`nav()` wiring and the failure branch. |
-| `page-bootstrap.test.js` | 11 | Every first-party page boots with missing DOM/globals (the "pages must tolerate what they do not use" rule). |
-| `site-wiring.test.js` | 8 | Local asset references resolve, nav targets exist, settings sidebar matches panels, no `/pages/*.html` link points at a missing file, the visitor counter cannot throw, Movies tab, side-menu deep links. |
-| `panic-log.test.js` | 19 | Log filtering/redaction, panic key matching, panic navigation, panic page structure, cloak profiles, tab restore, omnibox. |
-| `mobile-pwa.test.js` | 10 | Media-query-only CSS, desktop selectors untouched, manifest validity, SW shell caching, library placeholders. |
-| `settings-io.test.js` | 28 | Settings allowlist, per-type validation, partial imports, reset, no-storage/no-logger paths, panel wiring. |
-
-## Which page loads what
-
-`log.js` and `cloak.js` are on every page (17 + `panic.html`). Beyond that:
-
-| Page | Extra first-party scripts | Stylesheets |
-| --- | --- | --- |
-| `index.html` | `t.js`, `wisp.js`, `proxy-errors.js`, `browserfunctions.js`, `dropdown.js`, `debug-panel.js`, `settings-io.js`, `colors.js`, `splash.js`, `cursor.js`, `lib/particles.js`, `lib/three.min.js`, `lib/vanta.fog.min.js` | `styles/index.css`, `colors.css`, `t.css`, `dropdown.css`, `font.css`, `fa/*`, remixicon |
-| `pages/browser.html`, `browser-minimum.html`, `embed.html` | `wisp.js`, `proxy-errors.js`, `browserfunctions.js`, `t.js`, `colors.js`, `cursor.js`, `baremux/index.js`, `homework/math.all.js`, `homework/english.bundle.js`, `lib/particles.js` | `colors.css`, `elements.css`, `font.css`, `t.css`, `mobile.css`, remixicon |
-| `pages/play.html` | `colors.js`, `cursor.js`, `lib/particles.js` | `colors.css`, `elements.css`, `overlay.css`, `mobile.css` |
-| `pages/assistant.html` | `colors.js`, `cursor.js`, `t.js`, `vm.js`, `lib/particles.js` | `colors.css`, `elements.css`, `overlay.css`, `ai-elements.css`, `t.css`, `mobile.css` |
-| `pages/vms.html` | `colors.js`, `cursor.js`, `t.js`, `vm.js`, `lib/particles.js` | `colors.css`, `elements.css`, `overlay.css`, `t.css`, `mobile.css` |
-| `pages/games.html`, `apps.html`, `partners.html` | `colors.js`, `lib/particles.js` | `colors.css`, `elements.css`, `font.css`, remixicon |
-| `pages/movies.html`, `watch.html`, `movieframe.html` | `colors.js`, `cursor.js` | `colors.css`, `font.css` (+ Tailwind/Alpine CDNs) |
-| `pages/chatrooms.html`, `gmbl.html`, `classroom.html` | none | none (self-contained) |
-| `404.html`, `newtab.html` | `colors.js`, `t.js` (newtab) | `styles/index.css`, `colors.css`, `fa/*` |
-
-`panic.html` loads nothing but `log.js` + `cloak.js` and its own inline `<style>` — that is a
-requirement, not an accident.
-
-## Proxy stack
-
-Two backends, chosen in Settings → Proxy:
-
-1. **Scramjet** (default). The page owns the controller
-   (`new $scramjetController.Controller({ serviceworker, transport, config })`) and the SW only
-   forwards `prefix` requests back to it. Frames are per tab (`scramjetFrames`). Prefix `/~/sj/`;
-   runtime files live under `/homework/`.
-2. **Ultraviolet** (legacy). `uv/sw.js` handles `/uv/service/`, and bare-mux carries the transport.
-   bare-mux is created lazily (`getBareMuxConnection()`) so a blocked `/baremux/index.js` cannot take
-   down the Scramjet path.
-
-Transport: libcurl.js compiled to WASM talking to a **Wisp** server over a WebSocket. `libcurl/`
-holds generated bundles (`index.mjs`/`index.js`/`index.cjs`/`libcurl.mjs`), all built from
-`@mercuryworkshop/libcurl-transport@2.0.6` + `libcurl.js@0.7.5`, each embedding the WASM as base64.
-
-**Never hand-edit the embedded base64 WASM, the CA bundle, or the TLS verification flags.** To
-update: download both packages, rebuild the bundle, re-run `tests/libcurl-bundle.test.js` (WASM magic,
-`wasm not loaded` messaging, the 15 s load timeout, the `libcurl_abort` path).
-
-### Wisp selection contract
-
-Storage keys (`GraipWisp.KEYS`):
-
-- `graip_wispUrlSelected` — the endpoint the user picked (preset id, `Custom`, or `Local`). **Never**
-  overwritten by failover.
-- `graip_wispUrl` — the endpoint last used (may be a fallback).
-- `graip_wispUrlFallback` — set only when traffic moved automatically; cleared when the preferred
-  endpoint works again or the user picks.
-- `graip_wispUrlCustom`, `graip_wispUrlVerifiedAt` — custom URL and freshness.
-
-`GraipWisp.PRESETS` lists **30** endpoints (Mercury, Anura 1–6, Phantom, rhw, Alu 1–4, Incognito 1–4,
-Definitely Science 1–4, Terbium 1–4, Radius 1–2 plus two ad-blocking Radius routes). Rules that must
-not regress:
-
-- A probe is only successful when the server sends the initial Wisp packet (v1 sends `CONTINUE` for
-  stream 0 immediately; a socket that opens and stays silent is not a Wisp server). A URL that does
-  not end in `/` is not Wisp.
-- The preferred endpoint is probed alone first (1.5 s); only then is the pool raced. Availability is
-  not guaranteed for any public endpoint, so never describe them as "official" or "reliable" in UI
-  copy.
-- `setActiveServer()` (manual pick) clears the fallback and invalidates the per-tab cache.
-  `resetCache()` forces a fresh probe (Settings → *Test current server*).
-- `describeError()`/`GraipProxyErrors` classify curl codes: 7 = route down, 35 = TLS handshake,
-  60 = peer verification. Error 60 means the destination's chain, the client's trust bundle, the
-  clock, or route interception — **not** that a different Wisp host will help; route retries exist to
-  diagnose, and TLS verification must stay on.
-
-## Debug log
-
-`GraipLog` is the single recorder. Nothing calls `console.log` for diagnostics; a feature logs through
-`GraipLog.debug/info/warn/error(category, message, data)` and, for user actions,
-`GraipLog.action(...)`.
-
-- Two streams: **verbose on** (default) records everything; **verbose off** still records
-  `warn`/`error`. `setVerbose()` persists to `graip_verboseLogs` and re-posts the config to the
-  service worker.
-- Bounded: 1000 entries in memory, the last 400 mirrored into `graip_debugLog` (debounced write) so a
-  crash still leaves evidence. `clear()` keeps exactly one entry: "log cleared".
-- Privacy: `safeUrl()` strips the query string and fragment from every URL before it is stored, and
-  values are truncated. **Never log a full URL, a token, or page content.**
-- `sw.js` reports through `postMessage({ $graip$log: … })`, batched (25 entries / 400 ms), and only
-  after the page sends `$graip$logConfig`. Navigations are always reported; static subresources only
-  on failure.
-- Export: `exportJSON()`, `exportText()`, `download("json"|"txt")`, `copy()` — wired to Settings →
-  Debug. `GraipCheckLibrary` and `GraipProbeAll` are the panel's diagnostic buttons.
-
-Adding a log line to a new feature is expected, not optional: "capture every action" is the point of
-the panel.
-
-## Settings export / import
-
-`GraipSettings` (`assets/js/settings-io.js`) is the only thing that may read or write settings in
-bulk.
-
-- `SCHEMA` is the **allowlist**, one entry per preference: `{ key, group, label, type }`, plus
-  `trueValue`/`falseValue` for the two toggle conventions (`yes`/`no` and `on`/`off`) and `options`
-  for enums. A new setting must be added there or it will not survive a backup. Types: `bool`,
-  `token`, `label`, `text`, `url`, `wisp`, `key`, `enum`.
-- Nothing else is exported. `IGNORED` names the runtime keys that must never travel (`graip_wispUrl`,
-  `graip_wispUrlFallback`, `graip_wispUrlVerifiedAt`, `graip_debugLog`, `graip_libraryIssues`,
-  `graip_siteVersion`), and `graip_tabs*` is skipped by prefix. The log is not a setting: it has its
-  own export.
-- Import **re-validates every value** — a config file is untrusted input. `url` accepts only
-  `http(s)://`, a single-leading-slash site path, or `about:blank`; `wisp` only `ws(s)://`; `token`
-  and `label` are anchored regexes so `../` cannot reach the theme `<link href>`. Rejected entries
-  are reported per key and never block the rest.
-- Merge semantics: absent keys are untouched, `null`/`""` on an optional key means "leave it alone",
-  unchanged values are not rewritten. Importing a Wisp choice clears `graip_wispUrl`,
-  `graip_wispUrlFallback` and `graip_wispUrlVerifiedAt`, otherwise the old probe result keeps winning.
-- Almost every subsystem reads its setting once at boot, so the panel reloads after an import. That
-  reload sets `sessionStorage.graip_skipLeaveGuard = "1"`, which the two `beforeunload` handlers in
-  `index.html` check (and `DOMContentLoaded` clears) so importing "confirm before leaving" does not
-  block its own reload.
-- The API never throws: no storage, quota exceeded or a missing `GraipLog` all degrade to a report.
-
-## Panic and cloaking
-
-- `panic.html` is the only page that must render **nothing** of graip. It loads `log.js` and
-  `cloak.js` (for `safeUrl` and `blankDocument`) but sets `data-graip-no-auto-cloak="1"` on `<html>`
-  so `cloak.js` does not overwrite its decoy title.
-- The blackout is a `#blackout` overlay that is only removed once the target frame fires `load`
-  (+ two RAFs for same-origin targets, + a timeout as the last resort). Never reveal the frame
-  earlier: the whole feature exists so the proxy is never visible while the decoy loads.
-- `GraipCloak.PROFILES` is the single list of disguises (9 profiles: None, Google, Google Docs,
-  Google Drive, Google Classroom, Youtube, Canvas, Khan Acadamy, Desmos — the misspelling is in the
-  storage key space, not a typo to fix casually). `dropdown.js` renders it,
-  `panic.html` uses it, the `about:blank` window uses it. Add a profile there only.
-- `GraipCloak.TARGETS` is the separate panic destination list (9: Classroom, Google, Docs, Drive,
-  Canvas, Kahn Academy, Wikipedia, `about:blank`, Custom). Keys: `\`, `Escape`, `` ` ``, `~`, `]`,
-  `z`, `q`, `Shift+Z`.
-- Panic defaults: **off**, key `\`, destination Google Classroom, same-tab, decoy page on. A panic
-  writes `sessionStorage.graip_panicReturn` so `browserfunctions.js` can wipe the tab session on the
-  way back, and `clearBrowserTraces()` scrubs the address bar.
-- Letter keys (`z`, `q`) must not fire while typing or with modifiers; `matches()` enforces this.
-
-## Tabs and the omnibox
-
-- Tab state lives in `bTabs`; the session is mirrored to `sessionStorage["graip_tabs:<pathname>"]`
-  (`saveTabSession()` on every mutation + `pagehide`, throttled). Restored tabs are **lazy**: the URL
-  stays in `tab.restoreUrl` and is only navigated when the tab is first shown.
-- `pages/browser.html` calls `restoreTabSession()`; `browser-minimum.html`/`embed.html` call
-  `newTab()`; an explicit `?launch=` always starts fresh.
-- Omnibox: `installOmnibox()` (shortcuts) + `installOmniboxInput()` (bangs) run on DOMContentLoaded
-  in `browserfunctions.js`. `resolveOmniboxInput()` is pure and unit-tested — extend the bang table
-  there. Bangs: `!g !ddg !b !yt !w !gh !r`.
-- `clearBrowserTraces()` / "Clear session traces" forgets the tab session, `graip_lastUrl` and the
-  URL bar. Do not store visited URLs anywhere else.
-
-## Small-screen and offline
-
-- `assets/css/mobile.css` and the mobile section at the end of `styles/index.css` are **media-query
-  only**. `tests/mobile-pwa.test.js` fails if a top-level rule appears there, so the desktop layout
-  cannot regress by accident.
-- `sw.js` caches only same-origin GETs outside `/~/sj/` and `/uv/service/` (`SHELL_ASSETS`,
-  `graip-shell-v1`). Navigations are network-first with a cache fallback. Never cache proxied or
-  cross-origin responses; bump `SHELL_CACHE` when the asset list changes.
-
-## Code conventions
-
-- Plain browser JS: no modules except `import("/libcurl/libcurl.mjs")`, no TypeScript, no framework.
-  Alpine 3 (CDN) on `movies`/`watch`, hand-written DOM code elsewhere.
-- 2-space indent in `assets/js`, 4-space indent in HTML, tabs in `sw.js` and vendored files. Match the
-  surrounding file — this repo has three styles and that is fine.
-- Personal/global state uses `localStorage` with the `graip_` prefix (`decoy` is the one exception,
-  upstream's). Never reuse a `cherri_` key.
-- **Every DOM/global lookup in shared scripts must tolerate absence.** A page that does not use a
-  feature still loads the shared file, and one uncaught `TypeError` at top level kills the rest of
-  that file for that page. Guard (`if (!el) return;`), do not assume.
-- User-visible strings are short and sentence-cased without a trailing period on buttons ("Test
-  current server", not "Test Server.").
-- Comments explain *why* a workaround exists, not what the next line does. The existing comments are
-  the reason this codebase is maintainable; add one when you encode a non-obvious constraint.
-
-## UI conventions
-
-- Settings panels are `#settings-{general,gaming,cloaking,backup,debug,proxy,info,updates}`. Sidebar
-  entries carry `data-target` that must equal the panel suffix; deep links use
-  `/?launch=1&settings=1&section=proxy`. `switchSettingsPage()` ignores unknown targets instead of
-  blanking the area — keep that behaviour.
-- Loaded pages are iframes inside `#contentFrame`; a page-local "Settings" link must be
-  `/?launch=1&amp;settings=1` with `target="_top"`.
-- Reloading a proxied tab goes through `go(tab.url, tabId)` after `ensureTransport(true)`. Never
-  assign `iframe.src` directly: the SW error page and the controller cache both depend on `go()`.
-- Toasts: `showToast(type, message, iconClass)` from `t.js`.
-- New toggles: put `<div class="graip-toggle-slot" data-slot="name"></div>` in the panel and mount a
-  clone in `debug-panel.js`. Do not copy the 40-line SVG switch markup by hand.
-- New dropdowns: `<select class="settings-select">` is styled and used by the panic controls; the
-  custom `.x-selector` components are only worth it for ones with icons.
-
-## Testing and verification
-
-```bash
-node --test tests/*.test.js      # the only supported command; must stay green (106 tests)
+```
+┌─────────────────────────────── browser tab (this origin) ───────────────────────────────┐
+│                                                                                         │
+│  index.html  ── the shell ───────────────────────────────────────────────────────────┐   │
+│  │  sidebar nav, settings panels, drawers, address bar, tab strip                    │   │
+│  │  inline JS: navTo(), library loaders, settings wiring, visitor counter            │   │
+│  └───────────────┬──────────────────────────────────────────────────────────────────┘   │
+│                  │ iframe #contentFrame                                                │
+│                  ▼                                                                      │
+│  pages/*.html ── one page per feature (browser, games, movies, chat, …) ────────────┐   │
+│  │  pages/browser.html loads assets/js/browserfunctions.js:                          │   │
+│  │    tab model ──> Scramjet controller (page side) ──> iframe per tab               │   │
+│  └───────────────┬──────────────────────────────────────────────────────────────────┘   │
+│                  │ fetch(/~/sj/<encoded target>)                                       │
+│                  ▼                                                                      │
+│  sw.js (service worker) ── route() ──> $scramjetController (page) ──> libcurl WASM ──┐  │
+│                                                                                      │  │
+└──────────────────────────────────────────────────────────────────────────────────────┼──┘
+                                                                                       │
+                                          WebSocket (Wisp protocol)                    │
+                                                                                       ▼
+                                                       public or self-hosted Wisp server
+                                                       ──> HTTPS ──> destination site
 ```
 
-No network access is needed (or allowed) for the suites. They run in a `vm` context with mocked
-DOM/`localStorage`/`WebSocket`, so:
+Consequences you must internalise:
 
-- arrays created inside the context have a different `Array.prototype`; compare with
-  `JSON.stringify`, not `assert.deepStrictEqual`;
-- workers (`sw.js`) need `importScripts` and `self.addEventListener` mocks;
-- when a suite parses HTML, assert on strings (for example "does this page include
-  `id="css-theme-link"`") rather than booting a DOM.
+- **The service worker is the proxy's front door.** Without an active, controlling worker the
+  static host answers `/~/sj/<anything>` with its own 404. That is why `browserfunctions.js` waits for
+  `navigator.serviceWorker.ready`, then for actual control, before it navigates a tab.
+- **Nothing survives a host restart**, because nothing is on the host. All state is in the browser:
+  `localStorage`, `sessionStorage`, IndexedDB (service-worker caches only) and memory.
+- **There are no redirects, rewrites or headers to lean on** except what `vercel.json` (Vercel) or the
+  equivalent host config sets. Deep links must therefore be query strings on `index.html`, not paths.
+  That is why settings deep links are `/?launch=1&settings=1&section=proxy`.
+- **Cross-origin is the norm, not the exception.** The proxy turns every destination into same-origin
+  paths, and the shell deliberately never caches any of them.
 
-For behavioural checks, an out-of-tree jsdom harness works well:
+### The four layers
 
-```bash
-python3 -m http.server 8899 --bind 0.0.0.0 &     # from the repo root
-cd /tmp/verify && npm i jsdom@24                  # throwaway, never committed
+| Layer | Files | Loaded when |
+| --- | --- | --- |
+| **Shell** | `index.html`, `styles/index.css`, `assets/css/*`, `assets/js/{dropdown,settings,debug-panel,settings-io,splash}.js` | Always the app entry point |
+| **Pages** | `pages/*.html`, `assets/css/elements.css` | Inside `#contentFrame` when the user opens a feature |
+| **Browser engine** | `assets/js/browserfunctions.js`, `assets/js/wisp.js`, `assets/js/proxy-errors.js`, Scramjet bundles | Only on `index.html` and the three browser pages |
+| **Proxy runtime** | `sw.js`, `homework/`, `uv/`, `baremux/`, `libcurl/` | Service worker + on-demand `import()` |
+
+Two scripts sit above all layers and must load first on every page: `assets/js/log.js` (so it can
+catch every error) and `assets/js/cloak.js` (so a cloaked tab never shows the real title, even for a
+second).
+
+---
+
+## 2. Repository map
+
+```
+.
+├── index.html                 1,654 lines  the whole app shell (markup + 36 script blocks)
+├── panic.html                  231        self-contained panic decoy
+├── newtab.html                  43 lines  new-tab stub
+├── 404.html                    190        host 404 page (mini shell)
+├── start.html                50878        byte-for-byte Google Classroom copy (the disguise)
+├── sw.js                       651        service worker: proxy routing, blocklist, offline shell, logging
+├── manifest.json                49        PWA manifest
+├── vercel.json                  29        headers only (no build, no rewrites)
+├── README.md                    ~450      user-facing document
+├── AGENTS.md                    this file engineering handbook
+├── MOVING.md                    12        legacy fork stub
+├── LICENSE                              AGPL-3.0
+├── .gitignore                   41
+├── .github/workflows/sync-fork.yml 21   nightly upstream sync of the default branch
+├── docs/superpowers/plans/
+│   └── 2026-10-03-curl-60-wisp-scramjet-diagnosis.md
+│                                        historical investigation plan (curl 60 / Wisp)
+├── pages/                     15 files  features loaded into #contentFrame
+├── assets/
+│   ├── js/                    15 files  first-party scripts (+ lib/ vendored)
+│   ├── css/                   10 files  themes, layout, components, mobile
+│   ├── json/                   5 files  game/app/partner lists + particles config
+│   ├── img/                  811 files  thumbnails, icons, cloaks, cover
+│   ├── fonts/                 25 files  brand fonts (9 MB)
+│   └── icons/fonts/           15 files  Remix Icon 4.7.0
+├── styles/index.css                 1763 shell stylesheet (+ media-query mobile block)
+├── homework/                   9 files  Scramjet runtime, disguised filenames:
+│                                        `math.all.js` + `math.all.js.map`, `science.sync.js` +
+│                                        `science.sync.js.map`, `english.bundle.js` +
+│                                        `english.bundle.js.map`, `chemistry.sw.js` +
+│                                        `chemistry.sw.js.map`, `history.wasm.wasm`
+├── uv/                         6 files  Ultraviolet 3.2.10
+├── baremux/                    3 files  bare-mux 2.1.7
+├── libcurl/                    4 files  libcurl.js 0.7.5 bundles (WASM as base64):
+│                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
+├── fa/                       409 files  Font Awesome Free 7.1.0
+├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
+└── tests/                     13 files  107 dependency-free tests
 ```
 
-Harness notes:
+Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
 
-- `process.on("unhandledRejection", () => {})` is mandatory: jsdom surfaces page errors as unhandled
-  rejections and will otherwise kill the process.
-- Use `resources: "usable"` + `pretendToBeVisual: true`, wait for `load`, then ~300 ms before
-  clicking (dropdowns populate asynchronously).
-- Expect noise and filter it: `MessagePort`, `ServiceWorker`/`register`, `lucide`/`marked`/`io`/
-  Tailwind CDN failures, WebGL, `canvas.getContext()` returning null, particles.js drawing. None of
-  that is a site bug.
-- Chromium/Playwright is not available here, so proxy traffic cannot be exercised end to end. Do not
-  claim a proxy fix is "verified" — say what was and was not covered.
-
-## Known traps
-
-- Third-party endpoints `api.x8r.dev` (visitor counter, CometChat tokens, Hyperbeam) and the chat
-  socket (`qs03x443-3000.usw3.devtunnels.ms`) are long dead. Features built on them must degrade with
-  a visible message, not hang on a loader. The visitor counter now shows "—" and stops polling; chat
-  shows a notice; `vm.js` no-ops.
-- The movies grid talks to TMDb with a public key. The host is `api.themoviedb.org`; `api.tmdb.org`
-  does not serve the API. Streams come from `iframe.pstream.mov`, `multiembed.mov` and vidsrc.
-- CDN dependencies (Alpine, Tailwind, `marked`, `lucide`, KaTeX, `socket.io`, `emoji-mart`,
-  `eruda`, fonts) fail on filtered networks. Any feature that needs them must check for the global
-  before using it.
-- `stores/ucp-games/*`, `homework/math.all.js`, `assets/icons/fonts/index.html`, `start.html` and
-  `pages/classroom.html` are huge vendored files: greps and diffs against them are noise.
-- `start.html` contains upstream metadata with a real Gmail address in a `og-profile-acct` meta tag,
-  and `index.html` still points `og:image`/`twitter:image` at `https://cherri.x8r.dev`. Both are
-  upstream leftovers: change them to your own deployment if link previews matter, and do not treat
-  the address as this project's.
-- The repo's `main` history is a single commit; diff against `https://github.com/x8rr/cherri`
-  (shallow clone) to see what this fork changed. **The nightly `sync-fork.yml` workflow syncs the
-  default branch from upstream**, so fork work belongs on a branch, never on `main`.
-- `tests/site-wiring.test.js` enforces the invariants that were already broken once: the Movies tab
-  opens the built-in page, side menus deep-link to `/?launch=1&settings=1`, and every
-  `navTo()`/`switchSettingsPage()` target exists.
-- `tests/panic-log.test.js` (log filtering/redaction, panic key matching, panic navigation, panic page
-  structure, cloak profiles, tab restore, omnibox) and `tests/mobile-pwa.test.js` (media-query-only
-  CSS, manifest, service worker shell caching, library hygiene) cover the features added on top of
-  the fork. Both load the real modules into a `vm` context with a fake DOM/storage; prefer extending
-  them over adding a new harness.
-- `tests/settings-io.test.js` covers the settings file format: the allowlist, per-type validation
-  (`javascript:` icons, non-websocket Wisp URLs), partial imports, ignoring runtime keys, reset
-  semantics, and the no-storage / no-logger failure paths.
-- Anything that changes the top-level URL, title or storage must also update `AGENTS.md`: the
-  cloaking story is easy to break silently.
-
-## Repo sweep
-
-A file-by-file pass (every first-party file read, every vendored tree counted) produced this
-inventory. Numbers are from the current tree; treat them as a snapshot, not a contract.
+### Size and editability
 
 | Area | Files | Size | Editable? |
 | --- | --- | --- | --- |
-| `stores/ucp-games/` | 6,402 | 2.4 GB | No — vendored games (54 folders, biggest: `owt2/index.pck` 70 MB, `html/gd.html` 49 MB) |
-| `stores/gn-math/` | 624 | 13 MB | No — vendored single-file games |
-| `assets/img/` | 811 | 237 MB | Yes for adding icons; don't re-encode existing art |
-| `assets/fonts/` | 25 | 9 MB | No — licensed fonts |
-| `fa/` | 409 | 14 MB | No — Font Awesome Free 7.1.0 |
-| `assets/icons/fonts/` | 15 | 13 MB | No — Remix Icon 4.7.0 (+ 2 MB of vendor demo HTML) |
-| `tests/` | 13 | 120 KB | Yes — this is the source of truth for behaviour |
-| `pages/` | 15 | 1.7 MB | Yes (except `classroom.html`) |
-| `assets/css/` + `styles/` | 26 | 76 KB | Yes |
+| `stores/ucp-games/` | 6,402 | 2.4 GB | **No** — 54 vendored game folders (largest single files: `owt2/index.pck` 70 MB, `html/gd.html` 49 MB) |
+| `stores/gn-math/` | 624 | 13 MB | **No** — single-file HTML games, `0.html`… |
+| `assets/img/` | 811 | 237 MB | Adding icons yes; never re-encode existing art |
+| `fa/` | 409 | 14 MB | **No** — Font Awesome Free 7.1.0 |
+| `assets/icons/fonts/` | 15 | 13 MB | **No** — Remix Icon 4.7.0 (+ 2 MB of vendor demo HTML) |
+| `assets/fonts/` | 25 | 9 MB | **No** — licensed fonts |
+| `homework/`,`uv/`,`baremux/`,`libcurl/` | 22 | 8.3 MB | **No** — vendored proxy runtime |
+| `pages/` | 15 | 1.7 MB | Yes, except `classroom.html` |
 | `assets/js/` | 19 | 1.3 MB | Yes, except `lib/` |
-| `homework/`, `uv/`, `baremux/`, `libcurl/` | 22 | 8.3 MB | No — vendored proxy runtime |
+| `tests/` | 13 | 120 KB | Yes — the source of truth for behaviour |
+| `assets/css/` + `styles/` | 26 | 76 KB | Yes |
 | `docs/` | 1 | 24 KB | Reference only |
-| `.github/` | 1 | 1 KB | The nightly sync workflow |
-| Root files | 13 | ~2 MB (mostly `start.html`, 1.9 MB) | Yes, except `LICENSE` |
+| Root | 13 | ~2 MB | Yes, except `LICENSE` |
 
-Everything else in the tree is either an image, a font, or a vendored game's own asset — there is no
-hidden build directory, no generated code, and no file that exists only to satisfy a tool.
+---
 
-### Findings from that sweep (none of these are urgent; all are real)
+## 3. The shell — `index.html`
 
-1. **`assets/js/chatrooms.js` is dead code.** No page includes it; `chatrooms.html` implements its own
-   socket.io client. Keep it or delete it, but do not "fix" it expecting chat to come back.
-2. **`assets/js/lib/detectmobile.js` is only used by vendored GN-Math pages**, never by first-party pages.
-3. **`assets/css/themes/mint.css` exists but is not offered** in the theme dropdown
-   (`allThemeOptions` in `dropdown.js` lists 15 themes + `default`). Add `"mint"` there if you want it
-   reachable; `settings-io.js` will happily import it either way.
-4. **`assets/json/partners.json` is inconsistent**: the Hydra Network entry points at
-   `https://prism.onl/` and reuses `prism.png` although `assets/img/partners/hydra.png` exists. The
-   Hydra tile in `index.html` uses `hydra.png` directly, so the two disagree.
-5. **`index.html` has a stray `</html>` at line 64**, before the manifest/theme `<link>` tags that
-   were appended inside `<head>`. Browsers recover, but new head tags should go above it.
-6. **`pages/classroom.html` (37,761 lines) is unreachable** — not in nav, not referenced. It is a
-   second Classroom copy kept from upstream. `start.html` is the one that actually gets shown.
-7. **`pages/gmbl.html` is only reachable by URL**: its sidebar entry is commented out in
-   `index.html`. Left in place deliberately.
-8. **The settings sidebar has an icon-font mismatch**: it asks for `far fa-cog`, `far fa-bug`,
-   `far fa-hood-cloak`, `far fa-bell-on` etc., while the bundled font is Font Awesome **Free**, which
-   has no regular/pro variants for several of those, so some icons render blank. Adding icons means
-   using a name that exists in `fa/css/all.min.css` (`fa-floppy-disk` does, `fa-cog` does not).
-9. **Two identical `beforeunload` handlers** exist in `index.html`; both now honour
-   `graip_skipLeaveGuard`. If you add a third guard, check that flag.
-10. **`settings.js` is still loaded by 96 vendored store pages** that define neither `GraipWisp` nor
-    any settings markup — this is why every lookup in it is optional and must stay that way.
-11. **Visitors counter and chat endpoints are dead** (see Known traps). Both now fail visibly instead
-    of throwing.
-12. **`404.html` carries unreachable navigation JS**: `navTo()`, `rSearch()` and `toast()` survive
-    from the old shell, but the page has no `#homesearch` input and no nav links. `rSearch()` used to
-    point at the never-existing `/pages/ultraviolet.html`; it now points at `pages/browser.html`, which
-    is what it should use if the search box is ever restored. `tests/site-wiring.test.js` now fails on
-    any `/pages/*.html` reference that does not exist.
-13. **The fog background is the only WebGL dependency**, and a throw from `VANTA.FOG()` used to abort
-    the rest of that `<script>` block (visitor counter, Wisp status, settings wiring) on devices
-    without WebGL. It is now wrapped in `try/catch` and logs a warning.
-14. **No CI runs the tests.** `.github/workflows/` only syncs the fork. If you add a workflow, keep it
-    dependency-free: `node --test tests/*.test.js` needs nothing installed.
+1,654 lines: 8 body containers, 8 settings panels, 4 drawers, **36 `<script>` blocks** (12 inline, 24
+external). It is the app.
 
-### What a careful change looks like
+### 3.1 Body container map
 
-1. Read the file you are about to change **and** the section of this document that covers it.
-2. Change the smallest thing that works; nothing in `stores/`, `uv/`, `baremux/`, `libcurl/`,
-   `homework/`, `fa/` or `assets/icons/` is yours to clean up.
-3. Add or extend a test under `tests/` when behaviour changes (not when only styling changes).
-4. Run `node --test tests/*.test.js` until it is 106/106.
-5. If the change is user-visible, verify it in a jsdom harness against `python3 -m http.server`, and
-   say plainly what was and was not covered.
-6. Log it: a new action or failure path means a `GraipLog` call and, if the panel needs to show it, a
-   `debug-panel.js` hook. If it is a preference that should survive a backup, a `SCHEMA` row in
-   `settings-io.js`.
-7. Update this document (layout, contracts, traps, sweep findings) in the same commit.
+| Line | Element | Role |
+| --- | --- | --- |
+| 73 | `#gohomeblock` | Floating "back to home" button shown while a page is open |
+| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, chat, partners, settings, Discord. The `gmbl` (gambling) entry is commented out |
+| 156 | `#homeContent` | Hero: logo, splash text, search box, visitor count |
+| 179 | `#contentFrame` | The iframe every page loads into (`navTo`) |
+| 181 | `.settings-container.settings-hidden` | The settings sheet (fixed 625 px) |
+| 634 | `.browser-container` | The shell's own tab strip + address bar shown above proxied content |
+| 680 | `.apps-wrapper` | App shortcuts drawer |
+| 692 | `.download-wrapper` | "Download Games" drawer (Google Drive links) |
+| 709 | `.games-wrapper` | Games drawer (tiles for the selected store) |
+| 721 | `.partners-wrapper` | Partner sites drawer |
+| 738+ | `#vanta-fog-container`, cursor div | Vanta fog background and custom cursor host |
+
+Drawers (`apps`, `games`, `partners`, `download`) and the settings sheet are mutually exclusive:
+each `toggleX()` closes the others and adds a `.blurOverlay` the user can click to dismiss. The
+state is CSS classes `settings-shown` / `settings-hidden` — there is no boolean anywhere.
+
+### 3.2 Settings panels
+
+| Panel id | Line | Contains |
+| --- | --- | --- |
+| `#settings-general` | 220 | Theme selector, fog toggle (`#pjs-toggle`), custom cursor toggle (`#cursor-toggle`) |
+| `#settings-gaming` | 297 | Game store selector, overlay toggle (`#overlay-toggle`), "Download Games" |
+| `#settings-cloaking` | 348 | Decoy (cloak) selector, `openAB()` button + auto-about:blank toggle, panic toggle/keys/target/behaviour/decoy, "Test panic now", "Clear session traces" |
+| `#settings-backup` | 464 | Save/copy settings file, file + paste import, status `<pre>`, export preview, reset |
+| `#settings-debug` | 512 | Verbose toggle slot, export JSON/TXT/copy/clear, "Test all Wisp routes", log preview, library health |
+| `#settings-proxy` | 550 | Wisp selector + custom URL + status, backend selector, search engine selector |
+| `#settings-info` | 591 | Credits |
+| `#settings-updates` | 618 | Version + release link |
+
+Sidebar entries carry `data-target`, which must equal the panel suffix. `switchSettingsPage(target)`
+(script block at 1024) looks up `#settings-${target}`, ignores unknown targets (a bad `data-target`
+must never blank the area), removes `.settings-active` from every `.settings-page`, adds it to the
+target, and logs `panel <target>`. Deep link: `/?launch=1&settings=1&section=proxy`.
+
+### 3.3 Script block map
+
+| Lines | What it does |
+| --- | --- |
+| 40–57 | First inline block: redirect to `/start.html` unless `?launch` is present (the disguise) |
+| 748–757 | `particlesJS.load` when `graip_particlesOn` is `yes` |
+| 760–912 | **Library loaders**: `gj(file)`, `load(file, type, fn, toRun, prefix)`, `noteLibraryIssue`, `showPlaceholder`, `applyThumb`, `observe` (IntersectionObserver), initial `load("apps"…)` + `load(selectedStore…)`, `storeUpdated` listener |
+| 914–1002 | `registerSW()`: registers `/uv/sw.js` then `/sw.js`, toasts, hides the spinner, enables `#homesearch` |
+| 1004–1012 | Address-bar Enter handler (`#searchbar` → `rSearch`) |
+| 1014–1022 | `load`: clears stale `.active` frames |
+| 1024–1248 | Drawer/settings machinery: `switchSettingsPage`, `toggleSettings/Apps/Games/Partners/DownloadGames`, `rSearch`, `searchApps` |
+| 1250–1263 | `#homesearch` Enter handler |
+| 1265–1306 | `updatePJS()` fog toggle (tears down/creates the Vanta effect) |
+| 1308–1329 | `updateOverlaySettings()` (`graip_useOverlay`) |
+| 1331–1498 | Version check (`graip_siteVersion`), `resetTheme()`, `openAB()`, `updateABSettings()`, `updateCLSettings()` (confirm-leave), `updateCur()` (cursor), two `beforeunload` guards, `DOMContentLoaded` deep-link handler |
+| 1500–1657 | Vanta effect (WebGL, guarded), visitor counter, `setWispStatus`, `setCurrentWispServer`, Wisp custom-input prefill, `setWisp`, `testWispServer` |
+
+If you need to add shell behaviour, prefer a **new script block at the end** over editing an existing
+one: the blocks share the global scope, and a throw in an early block silently kills everything after
+it in that block only (not later blocks — they are separate `<script>` elements).
+
+### 3.4 `navTo()`
+
+```js
+navTo(l)                       // l is e.g. "movies", "play.html?launch=/stores/…", "home?launch=1"
+  ├─ GraipLog.action("nav", `open ${l}`)
+  ├─ l.includes("home")  → remove #contentFrame, show nav + #homeContent, hide #gohomeblock
+  ├─ l === "vms"         → fade nav out, show #contentFrame, src = /pages/vms.html
+  └─ otherwise           → ensure #contentFrame is in the body, hide the nav when the game overlay
+                           is on and the target is a game, then src = /pages/<l>
+```
+
+`navTo` assigns `iframe.src` **for pages**, never for proxied content. Proxied navigation always goes
+through `go()` in `browserfunctions.js` — see §5.5.
+
+### 3.5 Library loaders and health
+
+`load(file, type, …)` fetches `/assets/json/<file>.json`, drops entries without `name`/`url` (counting
+them via `noteLibraryIssue("entry", …)`), builds `.app` tiles, and defers thumbnail work to an
+IntersectionObserver. `applyThumb()` probes each image with `new Image()`; on error it adds
+`.app-image-missing` (`data-graip-missing="1"`), keeps the title, and records
+`noteLibraryIssue("thumbnail", …)`. `graip_libraryIssues` keeps the last 100 issues for Settings →
+Debug → *Check library now*.
+
+The games list follows `graip_gameStore` (`Classplay` → `classplay.json`, `GN-Math` → `gn-math.json`).
+The `storeUpdated` event (dispatched by `dropdown.js`) empties the container and reloads.
+
+---
+
+## 4. `pages/` catalogue
+
+Everything here is loaded in `#contentFrame` unless noted. `log.js` + `cloak.js` are on all of them.
+
+| File | Lines | Purpose | Key deps / ids / params |
+| --- | --- | --- | --- |
+| `browser.html` | 328 | Main proxied browser | `browserfunctions.js`, Scramjet bundle, `#searchbar`, `.tabs`, `.viewframe`; `?launch=<url>` first tab |
+| `browser-minimum.html` | 353 | Same engine, no floating logo/side menu, fixed-position frame | same, own inline `registerSW()` |
+| `embed.html` | 360 | Browser for embedding by other pages | same; reads `?launch=` and navigates once |
+| `play.html` | 507 | Game player | `#gameframe` iframe, overlay (`#gameOverlay`, `#sessionTime`, `#temperature`, `#currentTime`, `#startRecording`, `#stopRecording`, `#downloadBtn`), particles |
+| `games.html` | 343 | Games list as a standalone page | `/assets/json/<store>.json`, `#particles-container` |
+| `apps.html` | 327 | App shortcuts as a standalone page | `/assets/json/apps.json` |
+| `partners.html` | 295 | Partner list | `/assets/json/partners.json` |
+| `movies.html` | 214 | TMDb browse/search | `api.themoviedb.org/3`, `image.tmdb.org`, Alpine + Tailwind CDN |
+| `watch.html` | 510 | TMDb detail + player | season/episode UI, providers `iframe.pstream.mov`, `multiembed.mov`, vidsrc |
+| `movieframe.html` | 154 | Legacy wrapper embedding `movies.html` full-screen with its own nav | iframe + `<nav id="nav-ul">` |
+| `assistant.html` | 467 | AI page | `text.pollinations.ai` / `image.pollinations.ai`, marked + KaTeX + highlight.js CDNs, `vm.js` |
+| `vms.html` | 144 | VM page | `<iframe src="/pages/embed.html?launch=https://browser.lol/create">`, `vm.js` |
+| `chatrooms.html` | 3,196 | Socket.io chat | `socket.io` + `emoji-mart` CDNs, `CHAT_BACKEND = https://qs03x443-3000.usw3.devtunnels.ms/`, `graipChatOffline()` notice |
+| `gmbl.html` | 220 | Joke slot machine (`party-js`) | Reachable only by URL |
+| `classroom.html` | 37,761 | Second, unused Classroom copy | Not referenced anywhere; excluded from tests |
+
+Rules: a page-local "Settings" link must be `/?launch=1&amp;settings=1` with `target="_top"`
+(otherwise it renders the settings page *inside* the frame). Any page-level failure must show a
+message in the page, not hang — `chatrooms.html` and `assistant.html` show the pattern.
+
+---
+
+## 5. First-party JavaScript
+
+### 5.0 Boot order
+
+```
+every page:      log.js  →  cloak.js  →  (page-specific)
+index.html:      wisp.js → colors.js → splash.js → debug-panel.js → proxy-errors.js
+                 → browserfunctions.js → particles → dropdown.js → settings-io.js
+browser pages:   baremux/index.js → math.all.js → wisp.js → t.js → english.bundle.js
+                 → proxy-errors.js → browserfunctions.js
+```
+
+`log.js` is deliberately **not** deferred: it must install `window.onerror` before anything else can
+throw. Everything else is `defer` or ordered by hand where one file reads another's globals
+(`dropdown.js` reads `GraipWisp.PRESETS` and `GraipCloak.PROFILES`; `debug-panel.js` reads both).
+
+### 5.1 `assets/js/log.js` — `window.GraipLog` (547 lines)
+
+A bounded, redacting recorder. Design constraints: never throw, never log a query string, never grow
+without limit.
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `MEMORY_LIMIT` | 1000 | Entries kept in memory |
+| `STORAGE_LIMIT` | 400 | Entries mirrored to `graip_debugLog` |
+| `MAX_DATA_CHARS` | 2000 | Truncation for `message` and serialized `data` |
+| `LEVELS` | debug 10, info 20, warn 30, error 40 | Verbose off keeps ≥ warn |
+| `KEYS.verbose` / `KEYS.buffer` | `graip_verboseLogs` / `graip_debugLog` | The two keys this file actually touches |
+| `KEYS.maxEntries` | `graip_debugMaxEntries` | **Declared but never used.** `MEMORY_LIMIT`/`STORAGE_LIMIT` are the real caps; `settings-io.js` lists the key in `IGNORED` so it can never be imported |
+
+Entry shape:
+
+```json
+{ "seq": 42, "at": "2026-10-25T23:07:35.016Z", "level": "warn", "category": "proxy",
+  "message": "HTTP 404", "page": "https://host/index.html", "data": { "url": "https://x/y", "ms": 12 } }
+```
+
+API:
+
+| Member | Behaviour |
+| --- | --- |
+| `debug/info/warn/error(category, message, data)` | Record; `action()` is `debug` level and exists so user actions read clearly in the text export |
+| `log(level, …)`, `safeUrl(url)`, `cleanData(value, depth)` | Lower-level helpers (also used by `cloak.js`, `panic.html`) |
+| `entries()`, `recent(limit)`, `snapshot()` | In-memory copy / last N / export envelope |
+| `subscribe(fn)` | Panel re-render hook |
+| `isVerbose()`, `setVerbose(bool)`, `toggleVerbose()` | Persists `graip_verboseLogs` (`on`/`off`) and re-posts the SW config |
+| `configureServiceWorker()` | `controller.postMessage({ $graip$logConfig: { verbose } })` |
+| `exportJSON()`, `exportText()`, `download("json"\|"txt")`, `copy()` | Settings → Debug |
+| `clear()` | Empties, then logs exactly one entry: `log cleared` |
+| `install()` | Automatic (last line of the file) |
+
+Automatic capture installed by `install()`: `error` (capture phase, distinguishes resource failures
+from crashes), `unhandledrejection`, `console.warn`/`console.error` mirroring (skips its own output to
+avoid loops), a `fetch` wrapper that records non-OK and failed requests, and service-worker
+`message` reports from `sw.js`.
+
+Categories in use: `app`, `api`, `browser`, `cloak`, `console`, `library`, `nav`/`navigate`, `net`,
+`panic`, `proxy`, `resource`, `settings`, `stats`, `sw`, `ui`, `uncaught`, `unhandled-rejection`,
+`wisp`. Adding a category is free; adding a *second* logging mechanism is not.
+
+### 5.2 `assets/js/cloak.js` — `window.GraipCloak` (607 lines)
+
+Owns disguises, the panic key and the decoy documents. Loads on every page and applies the saved
+disguise on load (unless `<html data-graip-no-auto-cloak="1">`).
+
+| Table | Contents |
+| --- | --- |
+| `PROFILES` (9) | `None`, `Google`, `Google Docs`, `Google Drive`, `Google Classroom`, `Youtube`, `Canvas`, `Khan Acadamy`, `Desmos` — each `{ title, icon, page }` where `page` ∈ `none`/`search`/`video`/`document` |
+| `TARGETS` (9) | `Classroom`, `Google`, `Google Docs`, `Google Drive`, `Canvas`, `Khan Academy`, `Wikipedia`, `Blank (about:blank)`, `Custom URL…` |
+| `PANIC_KEYS` (8) | `\`, `Escape`, `` ` ``, `~`, `]`, `z`, `q`, `Shift+Z` (values are `KeyboardEvent.key`) |
+| `DEFAULTS` | `{ enabled:false, key:"\\", target:"Classroom", openIn:"same-tab", showDecoy:true }` |
+
+| Function | Behaviour |
+| --- | --- |
+| `settings()` | Reads storage into a validated object (unknown target/profile falls back to the default) |
+| `profileName()`, `profile(name)` | Validated accessor for `PROFILES` |
+| `applyCloak(name)` | Sets `document.title` and the `link[rel*=icon]` href; `None` restores graip's own |
+| `decoyMarkup(page)` | Generates a full HTML document: `search` (Google logo + search box), `video` (YouTube header + 6 skeleton tiles), anything else (Docs toolbar + grey text lines) |
+| `blankDocument(name)` | `decoyMarkup` + a hidden "press Esc" escape hint that appears on pointer movement |
+| `targetUrl()` | Resolves the configured destination (including a validated custom URL) |
+| `matches(event)` | Key matching: `Shift+Z` needs shift, letter keys are ignored while typing or with modifiers |
+| `panic(options)` | The panic action: wipe tab session, open `decoyUrl(...)` in this tab or a new one |
+| `installPanicKey()` | One capture-phase `keydown` listener per page (`window.__graipPanicInstalled`) |
+| `openAboutBlank()` | Opens the current site in an `about:blank`-titled window and leaves a neutral tab behind |
+| `autoAboutBlank()` | Runs once per tab (`sessionStorage.graip_abOpened`), only at top level, and only when `graip_autoAB === "yes"` |
+| `isCloaked()` | True when `window.opener` exists (i.e. this tab is the visible half of a cloak) |
+| `decoyUrl(url, cloak, showDecoy)` | Builds `/panic.html?to=…&cloak=…&plain=1` |
+
+Storage owned: `decoy`, `graip_cloakProfile`, `graip_cloakTitle`, `graip_cloakIcon`,
+`graip_panicEnabled`, `graip_panicKey`, `graip_panicTarget`, `graip_panicTargetUrl`,
+`graip_panicOpenIn`, `graip_panicShowDecoy`, `graip_autoAB`, plus `sessionStorage.graip_abOpened`
+and `sessionStorage.graip_panicReturn`.
+
+### 5.3 `assets/js/wisp.js` — `window.GraipWisp` (779 lines)
+
+Endpoint catalogue, protocol probe, failover, transport configuration, error classification.
+
+- `PRESETS`: **30** endpoints. Examples: `Mercury wss://wisp.mercurywork.shop/`, `Anura 1
+  wss://anura.pro/`, `Phantom wss://phantom.lol/wisp/`, `rhw wss://wisp.rhw.one/`, Radius
+  `wss://radiusproxy.app/wisp/` and its ad-blocking variant `/adblock/`. Plus `localPreset()`, which
+  offers `${ws(s)}://${location.host}/wisp/` when a deployment runs its own server.
+- `normalizeWispUrl(raw)`: adds the scheme if missing, forces a trailing `/`, rejects anything that is
+  not `ws(s)://host/path/`. A URL without the trailing slash is not Wisp.
+- `probeWispServer(url, { timeoutMs = 4000 })`: opens a `WebSocket`, resolves `{ ok, url, ms, reason,
+  detail }`. **`ok` requires the server's first frame** (Wisp v1 sends `CONTINUE` for stream 0
+  immediately); a socket that opens and stays silent is `reason: "silent"`.
+- `probePool(urls, { concurrency })`: races candidates, prefers the earliest success.
+- `getWorkingWispServer(options)`: the failover algorithm.
+  1. Return `state.verified` if fresh and not excluded and not `force`.
+  2. Probe the configured endpoint alone with `preferredTimeoutMs || 1500`.
+  3. On failure, race `candidateList()` (built-in presets + custom, minus exclusions).
+  4. Cache the winner in `state.verified`; write `graip_wispUrlFallback` only when the winner is not
+     the preferred endpoint; clear it when it is.
+  5. Dispatch `graipWispServerChanged` on `window` when the active URL changes.
+- `getConfiguredUrl()` (user choice: `graip_wispUrlSelected` → preset id / `Custom` →
+  `graip_wispUrlCustom`), `getActiveUrl()`, `getFallbackUrl()`, `isUsingFallback()`.
+- `setActiveServer(url, { custom })`: manual pick; clears fallback and cache, writes
+  `graip_wispUrlSelected` (and `graip_wispUrlCustom` when `custom`).
+- `resetCache()`: forgets `state.verified`/`inflight` (Settings → *Test current server*).
+- `configureTransport(target, options)`: `target.setTransport("/libcurl/index.mjs", [{ websocket: url }])`.
+- `curlCode(error)`, `describeError(error)`: user-facing strings; delegates classification to
+  `GraipProxyErrors` when present.
+
+`GraipWisp.KEYS`: `active` = `graip_wispUrl`, `preset` = `graip_wispUrlSelected`, `custom` =
+`graip_wispUrlCustom`, `verifiedAt` = `graip_wispUrlVerifiedAt`, `fallback` = `graip_wispUrlFallback`.
+
+### 5.4 `assets/js/proxy-errors.js` — `window.GraipProxyErrors` (84 lines)
+
+One classifier shared by the page and the service worker (`sw.js` `importScripts` it, so it must stay
+dependency-free and ES5-safe).
+
+| `kind` | Matched by | Retry budget (`maxRouteAttempts`) | Message intent |
+| --- | --- | --- | --- |
+| `peer-verification` | curl 60, "peer certificate", "cert verify" | 2 | Destination chain / client trust store / clock / interception; **verification stays on** |
+| `tls-handshake` | curl 35, "ssl connect error", "tls handshake" | 6 | This route could not complete TLS; another route may work |
+| `connectivity` | curl 7, "could not connect to server" | 6 | Route down or blocked |
+| `runtime` | "wasm not loaded", "load_wasm" | 0 | libcurl WASM failed to load; reload |
+| `other` | everything else | 0 | Raw message |
+
+`parseInt`-free: the code is read with `/error code\s+(-?\d+)/i`.
+
+### 5.5 `assets/js/browserfunctions.js` — the tab engine (1,199 lines)
+
+The most stateful file in the repo. Module state:
+
+```js
+let aTab = 0;                  // active tab id
+let tabCounter = 1;            // next id
+let bTabs = [];                // { id, title, url, history[], historyIndex, restoreUrl }
+let bareMuxConnection = null;  // Ultraviolet transport
+let wispUrl = null;            // active endpoint
+let transportPromise = null, transportClassPromise = null;
+let scramjetController = null, scramjetControllerPromise = null;
+const scramjetFrames = new Map();  // tabId -> Scramjet Frame
+const recoveryAttempts = new Map();// tabId -> attempts
+const closedTabs = [];         // Ctrl+Shift+T stack
+```
+
+Transport and controller:
+
+| Function | Notes |
+| --- | --- |
+| `getBareMuxConnection()` | Lazily creates `BareMuxConnection("/baremux/worker.js")`; a blocked worker must not break Scramjet |
+| `waitForServiceWorkerControl()` | Resolves when `navigator.serviceWorker.controller` exists, else after `controllerchange`; times out gracefully |
+| `loadTransportClass()` | `import("/libcurl/libcurl.mjs")`, cached |
+| `createTransport(server)` | `transportClass([{ websocket: url }])` |
+| `initScramjetController()` | `new $scramjetController.Controller({ serviceworker: "/sw.js", transport, config: SCRAMJET_CONFIG })` |
+| `ensureTransport(force, options)` | Returns the active wisp transport; on `force` re-probes and re-creates |
+| `scramjetFrameFor(tabId, element)` | Cached `Frame` per tab (this is why a tab's frame survives tab switches) |
+| `isUltravioletBackend()` | `(localStorage.graip_backend || "").toLowerCase() === "ultraviolet"` |
+
+`SCRAMJET_CONFIG = { prefix: "/~/sj/", scramjetPath: "/homework/math.all.js", injectPath:
+"/homework/science.sync.js", wasmPath: "/homework/history.wasm.wasm", virtualWasmPath:
+"scramjet.wasm.js" }` — the disguised filenames are load-bearing; see §9.
+
+Tabs:
+
+| Function | Notes |
+| --- | --- |
+| `newTab(initial)` | Pushes `{id, title, url, history, historyIndex, restoreUrl}`, builds `.tab[data-tab-id]` with a favicon `<img id="fav" data-fav-id="<id>">`, loads `/newtab.html` |
+| `switchTab(id)` | Sets `aTab`, toggles `.active` on frames, lazily navigates `restoreUrl` |
+| `closeTab(id)` | Removes DOM, pushes to `closedTabs` (cap 10), re-activates a neighbour |
+| `setTabTitle(id, title)` | Updates the model + the `<span>` in the tab strip |
+| `saveTabSession()` / `readTabSession()` / `clearTabSession()` | `sessionStorage` mirror under `graip_tabs:<pathname>` |
+| `restoreTabSession()` | Rebuilds tabs from storage, lazily; falls back to one new tab |
+
+`go(target, tabId)` — the only correct way to load proxied content:
+
+```
+1. find tab, frame, tab strip element; set the title to "Loading..."
+2. update the address bar and the Google favicon service image
+3. await Promise.all([initScramjetController(), serviceWorkerReady, ensureTransport()])
+   └─ failure → setTabError(GraipWisp.describeError(error))
+4. viewframe.onload:
+   ├─ documentElement.dataset.graipProxyError  → handleProxyFailure()
+   ├─ success → clear recoveryAttempts, copy iframe title to the tab, saveTabSession()
+   └─ cross-origin (throws) → fall back to the hostname as the title
+5. Ultraviolet backend: getBareMuxConnection() → setTransport("/libcurl/index.mjs") →
+   viewframe.src = __uv$config.prefix + __uv$config.encodeUrl(target)
+   Scramjet backend: (await scramjetFrameFor(...)).go(target)
+```
+
+Recovery and traces: `setTabError()` writes a toast + "Proxy unavailable"; `handleProxyFailure()`
+classifies the failure, respects `maxRouteAttempts`, calls `retryProxyRoute()` (which forces
+`ensureTransport(true)` and retries with a different endpoint), and gives up with an explanation.
+`scrubDocumentUrl()`, `clearBrowserTraces()` (drops the tab session, `graip_lastUrl` and the address
+bar) and `updateUrlFromIframe()` keep destinations out of the visible URL.
+
+Chrome actions: `b()`, `f()`, `r()`, `full()`, `hideBrowser()`, `launchEruda()`, `fixProxy()`
+(re-`ensureTransport(true)` and re-register both workers).
+
+Omnibox: `installOmnibox()` binds shortcuts (`Ctrl/Cmd+L/T/W`, `Ctrl+Tab`, `Ctrl/Cmd+Shift+T`,
+`Alt+←/→`), `installOmniboxInput()` binds the address bar, and `resolveOmniboxInput(raw)` is a pure
+function: a bare domain becomes `https://…`, anything else a Google search, with bangs `!g !ddg !b !yt
+!w !gh !r`. It is unit-tested — extend the bang table there, not in `index.html`.
+
+There is also a one-time migration: `graip_searchEngineGoogleDefaultV1` rewrites a stored
+`DuckDuckGo` default (from the era when the site shipped DDG as default) to `Google`.
+
+### 5.6 `assets/js/settings-io.js` — `window.GraipSettings` (831 lines)
+
+Backend-free settings backup. Full format spec in §11. Structural notes:
+
+- `SCHEMA` (22 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
+  `graip_tabs*` is skipped by prefix.
+- `sanitize(entry, raw)` is the only writer path and returns `{ ok, value }` / `{ ok: false, reason }`.
+- `apply(input)` merges: absent keys untouched, `null`/`""` on optional keys ignored, unchanged values
+  not rewritten, invalid values reported per key.
+- `preview(input)` produces the diff without writing (used by tests, not yet by the UI).
+- `download()`/`copy()`/`importFile(file)`/`reset()`/`reloadNow()` handle transfer.
+- Two globals are attached for inline buttons: `GraipSettingsUiCopy()`, `GraipSettingsUiReset()`.
+
+### 5.7 `assets/js/debug-panel.js` (456 lines)
+
+Settings wiring for Debug + Cloaking panels. `makeSwitch()` clones the first `.switch` in the DOM and
+`mountToggle(slotName, options)` mounts the clone into every `.graip-toggle-slot[data-slot=…]`, so new
+toggles cannot drift visually from the originals. Also renders the panic selects, the log preview, and
+defines the inline-button globals `GraipLogClear`, `GraipPanicTest`, `GraipClearTraces`,
+`GraipCheckLibrary`, `GraipProbeAll`.
+
+### 5.8 `assets/js/dropdown.js` (429 lines)
+
+The custom selectors (`wisp`, `backend`, `search-engine`, `decoy`, `theme`, `store`).
+`createSelector(type, selectedEl, optionsEl, allOptions, currentVal, storageKey, eventName, successMsg)`
+builds one: click opens (closing every other), click an option writes `localStorage[storageKey]`,
+dispatches `CustomEvent(eventName, { detail })` on `document`, toasts and logs
+(`settings` category). Backend values are lowercased in storage but displayed capitalised.
+`applyDecoy()` delegates to `GraipCloak.applyCloak`. `updateWispSelector()` re-renders the Wisp
+picker and shows `chosen → fallback` while a failover is live.
+
+### 5.9 The rest
+
+| File | Lines | Summary |
+| --- | --- | --- |
+| `settings.js` | 216 | Legacy: `setTabTitle/setTabIcon/applyTheme/settingsNav/setWispStatus/setWispServer/setCustomWispServer/testWispServer/cloakMe`. Loaded by 96 store pages, so **every lookup is optional** (`tests/page-bootstrap.test.js` enforces it) |
+| `colors.js` | 12 | Applies `graip_theme` to `#css-theme-link` before paint; must tolerate a missing link (`404.html` regressed this once) |
+| `t.js` | 146 | `showToast(type, message, icon)`; creates `.toast-container` if absent, pauses timers on hover, stacks toasts |
+| `cursor.js` | 115 | ZXS cursor; `cursor()` starts it, disabling removes `#cursor-style-zxs`/`#cursor-thank-you-zxs` and all listeners |
+| `splash.js` | 88 | `splashes[]` array of hero strings; the shell picks one at random |
+| `vm.js` | 118 | Legacy Hyperbeam launcher with `graip_vm_cooldown` (20 min); every lookup optional, no-ops on today's pages |
+| `chatrooms.js` | 129 | CometChat client (`api.x8r.dev` token). **Not loaded anywhere**; `chatrooms.html` uses socket.io. Dead code |
+| `lib/particles.js` | 963 | Vendored particles.js |
+| `lib/three.min.js` | 26,887 | Vendored three.js (Vanta dependency, `index.html` only) |
+| `lib/vanta.fog.min.js` | 440 | Vendored Vanta fog |
+| `lib/detectmobile.js` | 35 | `isMobile()` UA sniff; used only by vendored GN-Math pages |
+
+---
+
+## 6. Storage reference
+
+Prefix rule: first-party keys are `graip_*`; `decoy` is the single exception inherited from upstream.
+Never write a `cherri_*` key.
+
+### 6.1 `localStorage`
+
+| Key | Values | Written by | Read by | In backup? |
+| --- | --- | --- | --- | --- |
+| `graip_theme` | `midnight`, `void`, `ocean`, `forest`, `ember`, `dunes`, `lavendar`, `coral`, `golden`, `lime`, `magenta`, `neon`, `royal blue`, `sea`, `violet`, `mint`, `default` | `dropdown.js`, `settings.js` | `colors.js`, `settings.js`, `dropdown.js`, `index.html` | ✅ |
+| `graip_particlesOn` | `yes`/`no` | `index.html` (`updatePJS`) | `index.html` | ✅ |
+| `graip_customCursor` | `yes`/`no` | `index.html` (`updateCur`) | `cursor.js`, `index.html` | ✅ |
+| `graip_useOverlay` | `yes`/`no` | `index.html` | `index.html` | ✅ |
+| `graip_confirmLeave` | `yes`/`no` | `index.html` | both `beforeunload` handlers | ✅ |
+| `graip_backend` | `scramjet`/`ultraviolet` (lowercase) | `dropdown.js` | `browserfunctions.js` | ✅ |
+| `graip_searchEngine` | `Google`, `DuckDuckGo`, `Brave`, `Qwant`, `Bing`, `Startpage` | `dropdown.js` | `browserfunctions.js`, `index.html`, `404.html` | ✅ |
+| `graip_gameStore` | `Classplay`/`GN-Math` | `dropdown.js` | `index.html` | ✅ |
+| `graip_wispUrlSelected` | preset id, `Custom`, `Local` | `dropdown.js`, `wisp.js` | `wisp.js`, `dropdown.js` | ✅ |
+| `graip_wispUrlCustom` | `wss://…/` | `wisp.js` | `wisp.js`, `index.html` | ✅ |
+| `graip_wispUrl` | active endpoint (may be a fallback) | `wisp.js` | `wisp.js` | ❌ runtime |
+| `graip_wispUrlFallback` | endpoint that answered | `wisp.js` | `wisp.js`, `index.html` | ❌ runtime |
+| `graip_wispUrlVerifiedAt` | epoch ms | `wisp.js` | `wisp.js` | ❌ runtime |
+| `decoy` | profile name | `dropdown.js`, `cloak.js` | `cloak.js`, `settings.js` | ✅ |
+| `graip_cloakProfile` | profile name | `cloak.js` | `cloak.js` | ✅ |
+| `graip_cloakTitle` | string ≤120 | `cloak.js`, `settings.js` | `cloak.js`, `settings.js` | ✅ |
+| `graip_cloakIcon` | `/path` or `https://…` | `cloak.js`, `settings.js` | `cloak.js`, `settings.js` | ✅ |
+| `graip_panicEnabled` | `yes`/`no` | `debug-panel.js` | `cloak.js` | ✅ |
+| `graip_panicKey` | `KeyboardEvent.key` | `debug-panel.js` | `cloak.js` | ✅ |
+| `graip_panicTarget` | label from `TARGETS` | `debug-panel.js` | `cloak.js` | ✅ |
+| `graip_panicTargetUrl` | URL | `debug-panel.js`, `cloak.js` | `cloak.js` | ✅ |
+| `graip_panicOpenIn` | `same-tab`/`new-tab` | `debug-panel.js` | `cloak.js` | ✅ |
+| `graip_panicShowDecoy` | `yes`/`no` | `debug-panel.js` | `cloak.js` | ✅ |
+| `graip_autoAB` | `yes`/`no` (anything else = off) | `index.html` | `cloak.js` | ✅ |
+| `graip_verboseLogs` | `on`/`off` (default on) | `log.js` | `log.js` | ✅ |
+| `graip_debugLog` | JSON array (last 400) | `log.js` | `log.js`, `debug-panel.js` | ❌ use Debug → Export |
+| `graip_debugMaxEntries` | *(never written or read)* | — | — | ❌ |
+| `graip_libraryIssues` | JSON array (last 100) | `index.html`, `debug-panel.js` | `debug-panel.js` | ❌ per-device |
+| `graip_siteVersion` | version string | `index.html` | `index.html` | ❌ |
+| `graip_lastUrl` | last address-bar URL | `browserfunctions.js` | `browserfunctions.js` | ❌ scrubbed by "Clear traces" |
+| `graip_vm_cooldown` | epoch ms | `vm.js` | `vm.js` | ❌ |
+| `graip_searchEngineGoogleDefaultV1` | `1` | `browserfunctions.js` | `browserfunctions.js` | ❌ migration marker |
+| `bare-mux-path` | worker path (bare-mux's own) | bare-mux | bare-mux | ❌ |
+
+### 6.2 `sessionStorage` (per tab, dies with the tab)
+
+| Key | Purpose |
+| --- | --- |
+| `graip_tabs:<pathname>` | Tab session mirror (`browserfunctions.js`) |
+| `graip_panicReturn` | Set by a panic so the browser wipes the tab session on return |
+| `graip_abOpened` | Auto-about:blank has run once in this tab |
+| `graip_skipLeaveGuard` | One-shot: the settings importer's own reload must not trigger the leave prompt |
+
+### 6.3 Service-worker caches
+
+| Cache | Contents | Invalidation |
+| --- | --- | --- |
+| `graip-shell-v1` | 27 same-origin shell assets (`SHELL_ASSETS`) | Bump `SHELL_CACHE`; `activate` deletes every `graip-shell-*` that does not match |
+
+Proxy responses and cross-origin requests are never cached. Range requests bypass the cache entirely.
+
+---
+
+## 7. Event contracts
+
+Custom events on `document` (from `dropdown.js`) and `window` (from `wisp.js`):
+
+| Event | Target | `detail` | Producer | Consumer |
+| --- | --- | --- | --- | --- |
+| `themeUpdated` | `document` | theme name | `dropdown.js` | `dropdown.js` (swaps `#css-theme-link`) |
+| `decoyUpdated` | `document` | profile name | `dropdown.js` | `dropdown.js` → `GraipCloak.applyCloak` |
+| `storeUpdated` | `document` | `Classplay`/`GN-Math` | `dropdown.js` | `index.html` (reloads the games grid) |
+| `wispUpdated` | `document` | endpoint | `dropdown.js` | `dropdown.js` (`selectWisp`) |
+| `backendUpdated` | `document` | `scramjet`/`ultraviolet` | `dropdown.js` | *(none today; reload to apply)* |
+| `graipWispServerChanged` | `window` | endpoint | `wisp.js` | `index.html` (`setCurrentWispServer`, `updateWispSelector`) |
+
+Service-worker messages:
+
+| Message | Direction | Payload |
+| --- | --- | --- |
+| `$graip$logConfig` | page → worker | `{ verbose: boolean }` — enables/disables worker logging |
+| `$graip$log` | worker → page | `{ level, category, message, data }`, batched 25 entries / 400 ms |
+
+---
+
+## 8. Service worker — `sw.js`
+
+651 lines, tabs for indentation (vendored style). It is both the proxy front door and the offline
+shell. `importScripts("/assets/js/proxy-errors.js", "/homework/chemistry.sw.js")` — so
+`proxy-errors.js` must never use `let`/`const` at top level or ES2015+ syntax the worker cannot parse.
+
+### 8.1 Lifecycle
+
+| Event | Behaviour |
+| --- | --- |
+| `install` | `skipWaiting()` immediately, then opens `graip-shell-v1` and `cache.add`s every `SHELL_ASSETS` entry individually (one failure must not fail the install) |
+| `activate` | Deletes stale `graip-shell-*` caches, then `clients.claim()` |
+
+Before this fork, the worker never called `skipWaiting()`, so a fix to this file (or to the blocklist)
+did nothing until every tab was closed.
+
+### 8.2 Fetch pipeline
+
+```
+fetch event
+ ├─ url includes "supabase.co"           → return (untouched)
+ ├─ method !== GET                      → return
+ ├─ same-origin AND not a proxy path    → Range header? return : respondWith(shellRequest)
+ └─ everything else                     → respondWith(handleRequest)
+       ├─ blockedTarget(url)?  → 403 "Site Blocked" + warn log
+       ├─ !$scramjetController.shouldRoute(event) → fetch(request)
+       ├─ route(event) throws → transportErrorPage(event, error) + error log
+       ├─ response contains a rendered transport error → transportErrorPage + error log
+       └─ log navigation (always) / other requests (verbose, non-static) → return response
+```
+
+`isProxyPath()` is `/~/sj/` or `/uv/service/`. `SUBRESOURCE_NOISE` (images, fonts, media) keeps static
+subresources out of the log unless they fail.
+
+### 8.3 Ad blocklist
+
+`CONFIG.blocked` is an ordered list of patterns (`"youtube.com/pagead/*"`, `".criteo.com"`,
+`"*/ads/*"`, …). Matching happens in the worker on the **decoded destination**, not on the proxy URL, so
+nothing has to travel through the frame. `toRegex()` translates `*` → `[^/]*` and `**` → `.*`; entries
+with a `/` are matched host + path, entries without are host-only; a leading `.` means "this host or a
+subdomain" via the regex anchor; `#` and `*` prefixes are stripped. A blocked request never reaches
+libcurl.
+
+### 8.4 Error page
+
+`transportErrorPage(event, error)` renders a self-contained dark page (`data-graip-proxy-error="1"`,
+`#graip-proxy-message`) for navigations/documents and a plain `502` text body for subresources. The
+marker is what `go()`'s `onload` looks for, which is how a route dying mid-session is detected.
+
+### 8.5 Logging
+
+`LOG_STATE = { enabled:false, queue:[], flushTimer }`; `LOG_BATCH = 25`, `LOG_FLUSH_MS = 400`.
+`sendLog()` queues, flushes immediately on `warn`/`error`, and `flushLog()` posts
+`{ $graip$log: entry }` to every window client (`includeUncontrolled: true`). Worker logging stays off
+until the page sends `$graip$logConfig` — that is why a fresh worker is silent in the panel until the
+first page load configures it.
+
+### 8.6 Shell cache
+
+`SHELL_ASSETS` = 27 first-party files (shell HTML, the CSS/JS the shell needs, `particles.json`,
+`fav.png`). `shellRequest()` is network-first with a cache fallback so a deploy is picked up
+immediately and an offline visit still boots. Bump `SHELL_CACHE` when the list or behaviour changes.
+
+---
+
+## 9. Proxy stack
+
+Two backends, one transport.
+
+### 9.1 Scramjet (default)
+
+| Piece | Path | Role |
+| --- | --- | --- |
+| Client bundle | `homework/math.all.js` | `$scramjet` (main world + injected world), 227 KB |
+| Inject script | `homework/science.sync.js` | Loaded into proxied documents |
+| Controller (page) | `homework/english.bundle.js` | `$scramjetController.Controller` (`0.0.14`) |
+| Controller (worker) | `homework/chemistry.sw.js` | Imported by `sw.js` |
+| WASM | `homework/history.wasm.wasm` | 585 KB payload |
+
+Prefix `/~/sj/`. The **page** owns the controller and the cookie jar; the worker only forwards
+`prefix` requests back to the page that owns the frame. Frames are per tab
+(`scramjetFrames: Map<tabId, Frame>`).
+
+### 9.2 Ultraviolet (legacy)
+
+| Piece | Path | Role |
+| --- | --- | --- |
+| Bundle / client / handler | `uv/uv.bundle.js`, `uv/uv.client.js`, `uv/uv.handler.js` | UV 3.2.10 (build 92d9075) |
+| Worker | `uv/uv.sw.js`, registered via `uv/sw.js` + `uv/uv.config.js` | `/uv/service/` prefix, XOR codec |
+
+Ultraviolet is selected by `graip_backend === "ultraviolet"`; `browserfunctions.js` then sets
+`viewframe.src = __uv$config.prefix + __uv$config.encodeUrl(target)` after installing the transport
+into bare-mux.
+
+### 9.3 Transport chain
+
+```
+page code ── import("/libcurl/libcurl.mjs")
+          ── libcurl-transport 2.0.6 (BareTransport)
+          ── libcurl.js 0.7.5 (curl + Mbed TLS + nghttp2 + CA bundle, WASM as base64)
+          ── WebSocket ──> Wisp server ──> HTTPS ──> destination
+```
+
+`baremux/` (2.1.7, build c56d286) is the MessagePort plumbing used by Ultraviolet and by the
+`setTransport()` path; it is created lazily so a blocked `/baremux/index.js` cannot break Scramjet.
+
+**Never hand-edit the embedded base64 WASM, the CA bundle, or the TLS verification flags.** To
+upgrade: unpack `@mercuryworkshop/libcurl-transport@<v>` and `libcurl.js@<v>`, rebuild all four files in
+`libcurl/`, then run `tests/libcurl-bundle.test.js` (WASM magic, `wasm not loaded` messaging, 15 s load
+timeout, `libcurl_abort` path).
+
+### 9.4 Wisp protocol contract
+
+- v1 framing; **the server sends `CONTINUE` for stream 0 immediately on connect**. A socket that opens
+  and says nothing is not a Wisp server — treat it as a failure, not a success.
+- Endpoint URLs must end with `/`. `normalizeWispUrl()` enforces it.
+- Public endpoints are community-run and may vanish: never describe them as official, always keep the
+  failover path working, and never write a successful probe back over the user's saved choice.
+
+---
+
+## 10. Timeouts, retries and budgets
+
+| Knob | Value | Where |
+| --- | --- | --- |
+| Preferred-endpoint probe | 1500 ms | `wisp.js` `getWorkingWispServer` |
+| Pooled probe | 4000 ms each | `probeWispServer` default |
+| "Test all Wisp routes" | 4000 ms, 3 at a time | `debug-panel.js` |
+| libcurl transport load | 15 s | `libcurl/` bundle (tested) |
+| Route retries — peer verification | 2 | `GraipProxyErrors.maxRouteAttempts` |
+| Route retries — TLS / connectivity | 6 | same |
+| Visitor counter | 30 s interval, stops after 3 failures | `index.html` |
+| VM cooldown | 20 min | `vm.js` |
+| Toast lifetime | ~4.3 s | `t.js` |
+| Log flush | 25 entries / 400 ms | `sw.js` |
+| Log persistence debounce | 900 ms | `log.js` |
+| Settings reload after import | 900 ms | `settings-io.js` |
+
+---
+
+## 11. Settings file format
+
+`GraipSettings.exportData()` produces:
+
+```json
+{
+  "format": "graip-settings",
+  "version": 1,
+  "exportedAt": "2026-10-25T23:07:35.016Z",
+  "site": "https://your-site/",
+  "settings": { "graip_theme": "void", "graip_particlesOn": "no", "graip_panicKey": "Escape" }
+}
+```
+
+Accepted inputs on import: this object, the same object without the wrapper (a bare map), or either as
+a JSON string. `MAX_BYTES` = 64 KiB.
+
+### 11.1 Schema (22 keys)
+
+| Group | Keys | Type |
+| --- | --- | --- |
+| appearance | `graip_theme`, `graip_particlesOn`, `graip_customCursor` | token, bool, bool |
+| proxy | `graip_wispUrlSelected`, `graip_wispUrlCustom`, `graip_backend`, `graip_searchEngine` | label, wisp (optional), token, token |
+| cloaking | `decoy`, `graip_cloakTitle`, `graip_cloakIcon`, `graip_cloakProfile`, `graip_panicEnabled`, `graip_panicKey`, `graip_panicTarget`, `graip_panicTargetUrl`, `graip_panicOpenIn`, `graip_panicShowDecoy`, `graip_autoAB` | label, text, url, label, bool, key, label, url, enum, bool, bool |
+| gaming | `graip_gameStore`, `graip_useOverlay`, `graip_confirmLeave` | token, bool, bool |
+| logging | `graip_verboseLogs` | bool (`on`/`off`) |
+
+### 11.2 Validation rules (the security boundary)
+
+| Type | Accepts | Rejects |
+| --- | --- | --- |
+| `bool` | `yes/on/true/1/y`, `no/off/false/0/n`, real booleans | anything else |
+| `token` | `^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$` | paths, traversal, markup |
+| `label` | same + `()` `’` `'` | markup, slashes |
+| `text` | ≤120 chars, no `<`/`>` | HTML |
+| `url` | `http(s)://…`, `/single-leading-slash`, `about:blank` | `javascript:`, `data:`, `//host` |
+| `wisp` | `ws(s)://host/path` | http(s) URLs, bare hosts |
+| `key` | one printable char, `Shift+X`, or a named key (`Escape`, `F1`…) | whitespace, words |
+| `enum` | the entry's `options` (case-insensitive) | everything else |
+
+Control characters are rejected for every type. `null`/`""` on an optional key means "leave it alone",
+not "clear it".
+
+### 11.3 Merge and side effects
+
+- Absent key → untouched. Invalid → skipped and reported. Same value → counted as unchanged, not
+  rewritten.
+- Importing `graip_wispUrlSelected`/`graip_wispUrlCustom` removes `graip_wispUrl`,
+  `graip_wispUrlFallback` and `graip_wispUrlVerifiedAt`, otherwise the cached probe result keeps
+  winning and the import looks like a no-op.
+- After a successful import the panel reloads (settings are read once at boot). The reload sets
+  `sessionStorage.graip_skipLeaveGuard = "1"`, which both `beforeunload` handlers check and
+  `DOMContentLoaded` clears.
+
+---
+
+## 12. Cloaking and panic mechanics
+
+### 12.1 What a disguise touches
+
+`applyCloak(name)` sets `document.title` and the `link[rel*=icon]` href only. It is intentionally cheap
+and runs on every page load — a tab that says "graip" while a game is open defeats the point.
+`PROFILES[x].icon` may point at a bundled file (`/assets/img/cloaks/*.png`) or a remote favicon.
+
+### 12.2 Panic sequence
+
+```
+keydown (capture, every page)
+ ├─ matches(event)?  (enabled + key match + not typing + modifiers)
+ ├─ preventDefault + stopPropagation
+ └─ panic()
+     ├─ clearTabSession()                      (open tabs forget the session)
+     ├─ requestAnimationFrame ×2                (let any pending paint settle)
+     └─ openIn === "new-tab" ? openInNewTab() : location.assign(decoyUrl(...))
+          decoyUrl = /panic.html?to=<dest>&cloak=<profile>[&plain=1]
+```
+
+`panic.html`:
+
+1. Renders `#blackout` (`#000`, `position:fixed`, z-index above everything) and a hidden frame.
+2. Sets the decoy title/icon immediately (from `?cloak=`), so the tab already looks right.
+3. Loads `?to=` into the frame. On `load` (+ two `requestAnimationFrame`s for same-origin targets, or
+   a hard timeout as the last resort) it adds `body.revealed`, drops the blackout and reveals the
+   decoy page.
+4. Calls `history.replaceState({}, "", "/panic.html")` **before** the target loads, so the destination
+   never appears in the address bar or the back-button history.
+5. `Escape` returns to `sessionStorage.graip_panicReturn` (or a neutral site) and wipes the tab session.
+
+Nothing from graip may ever be visible on that page. It loads only `log.js` and `cloak.js` (for
+`safeUrl`/`blankDocument`) and sets `data-graip-no-auto-cloak="1"` so `cloak.js` does not overwrite its
+title.
+
+### 12.3 Auto about:blank
+
+`autoAboutBlank()` runs only when `graip_autoAB === "yes"`, only at top level, and only once per tab
+(`sessionStorage.graip_abOpened`). It opens the current URL in a new window whose document is
+`blankDocument(profile)` — a static decoy page with a hidden "press Esc" hint — so the address bar shows
+`about:blank` while the real site runs in the child window.
+
+---
+
+## 13. CSS architecture
+
+| File | Lines | Scope |
+| --- | --- | --- |
+| `styles/index.css` | 1,763 | The shell only (nav, tabs, address bar, drawers, settings sheet, toasts, library tiles, then the mobile block) |
+| `assets/css/colors.css` | 18 | Default palette, 13 variables on `:root` |
+| `assets/css/themes/*.css` | 16 files | Same 13 variables per theme — `coral.css`, `dunes.css`, `ember.css`, `forest.css`, `golden.css`, `lavendar.css` (sic), `lime.css`, `magenta.css`, `midnight.css`, `mint.css`, `neon.css`, `ocean.css`, `royal blue.css` (space in the name), `sea.css`, `violet.css`, `void.css` |
+| `assets/css/elements.css` | 344 | Shared layout for the standalone pages (grids, bottom nav, custom select) |
+| `assets/css/dropdown.css` | 137 | `.x-selector` widgets |
+| `assets/css/font.css` | 151 | 24 `@font-face` rules, 16 families |
+| `assets/css/t.css` | 55 | Toasts |
+| `assets/css/overlay.css` | 154 | In-game overlay |
+| `assets/css/ai-elements.css` | 32 | AI chat bubbles |
+| `assets/css/cursor.css` | 47 | Custom cursor |
+| `assets/css/mobile.css` | 142 | **644 px media query only** |
+
+### 13.1 The variable contract
+
+Every theme file defines exactly these on `:root`: `--bg`, `--bg-2`, `--bg-3`, `--bg-4`, `--bg-5`,
+`--border`, `--border-2`, `--border-3`, `--border-4`, `--text`, `--bright-text`, `--accent`,
+`--accent-2`. A new theme is a copy of an existing file with 13 colours changed — nothing else. Themes
+are selected by swapping `#css-theme-link`'s href to `/assets/css/themes/<name>.css` (or
+`/assets/css/colors.css` for `default`).
+
+### 13.2 Breakpoints and the desktop guarantee
+
+Mobile rules exist in `styles/index.css` (inside `@media (max-width: 900px)` and `(max-width: 640px)`
+blocks at the end of the file) and in `assets/css/mobile.css` (640 px only).
+`tests/mobile-pwa.test.js` fails if *any* top-level rule appears in either mobile section, so the
+desktop view cannot change by accident. Add mobile fixes inside those blocks, never at top level.
+
+### 13.3 Class conventions
+
+- Layout/state: `.hcontainer`, `.vflex`, `.settings-shown` / `.settings-hidden`, `.active`,
+  `.settings-page` / `.settings-active`, `.blurOverlay`.
+- Components: `.tab`, `.viewframe`, `.newtab`, `.app`, `.app-image-missing`, `.toast-container`,
+  `.graip-toggle-slot`, `.settings-select`, `.settings-backup-textarea`, `.debug-preview`.
+- Selectors: `.wisp-selector`, `.backend-selector`, `.search-engine-selector`, `.decoy-selector`,
+  `.theme-selector`, `.store-selector` — each needs `<name>-selected`, `<name>-options`, and gets a
+  `<name>-show` class on open.
+- Utility classes from Tailwind CDN appear inline on some pages. They are not part of the design
+  system; do not build on them.
+
+---
+
+## 14. Data formats
+
+### 14.1 Game and app lists
+
+```json
+[ { "name": "Crazy Cattle", "url": "/stores/ucp-games/cc3d/", "img": "/assets/img/games/cc3d.png" } ]
+```
+
+`name` and `url` are required (the loader drops entries without them and records a library issue);
+`img` is optional and gets a placeholder when it fails. `games` entries open through
+`pages/play.html?launch=<url>`; `apps` entries may be external (`https://…`) and are opened by
+`rSearch`. Totals: `classplay.json` 97, `gn-math.json` 478, `apps.json` 30, `partners.json` 2.
+
+### 14.2 Images
+
+`assets/img/games/` 119 PNGs + `assets/img/games/gn-math/` 622 (one per GN-Math entry);
+`assets/img/apps/` 50 (29 referenced); `assets/img/cloaks/` 8; `assets/img/partners/` 2; `fav.png`
+(160×160), `fav.svg`, `cover.png`, `s.png`, `c-down.png`. Thumbnails are lazy (`data-bg` +
+IntersectionObserver), never `<img>` in the grid.
+
+### 14.3 Fonts and icons
+
+`assets/fonts/`: 16 top-level files + `gg-sans/` (4 weights) + `sfc/` (6 SF Compact weights);
+`googlesans.ttf` is 4 MB — the single largest first-party asset. `fa/` is Font Awesome **Free** 7.1.0
+(21 CSS files, 388 webfonts) — Pro-only icon names render nothing. `assets/icons/fonts/` is Remix Icon
+4.7.0 plus the vendor's demo HTML; only `remixicon.css` is used by the site.
+
+---
+
+## 15. Testing
+
+```bash
+node --test tests/*.test.js        # 107 tests, ~4 s, no dependencies, no network
+```
+
+| File | Tests | Behaviour it pins |
+| --- | --- | --- |
+| `wisp.test.js` | 5 | URL normalisation, preset lookup, handshake probing |
+| `wisp-selection.test.js` | 7 | Chosen endpoint survives failover, fallback labelling, custom URLs |
+| `proxy-errors.test.js` | 3 | curl code → message classification, retry budgets |
+| `scramjet-errors.test.js` | 4 | Worker error page, proxy-vs-origin failures |
+| `service-worker-control.test.js` | 2 | `skipWaiting`/`claim`, controller readiness |
+| `libcurl-bundle.test.js` | 6 | WASM magic, load timeout, abort path, no TLS downgrade |
+| `browser-recovery.test.js` | 2 | Route recovery path |
+| `browser-tab-navigation.test.js` | 1 | `go()`/`nav()` wiring and failure branch |
+| `page-bootstrap.test.js` | 11 | Every page boots with missing DOM/globals |
+| `site-wiring.test.js` | 9 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure and no duplicate `<script src>` |
+| `panic-log.test.js` | 19 | Log filtering/redaction, panic matching/navigation, panic page structure, cloak profiles, tab restore, omnibox |
+| `mobile-pwa.test.js` | 10 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
+| `settings-io.test.js` | 28 | Allowlist, validation, partial imports, reset, failure paths, panel wiring |
+
+Conventions that make these work — follow them, they cost nothing:
+
+- Modules are loaded into a `vm` context with hand-built fakes; nothing uses jsdom.
+- Arrays/objects created inside the context have a different prototype: compare with
+  `JSON.stringify`, not `assert.deepStrictEqual`.
+- Workers need `importScripts` and `self.addEventListener` stubs, and `self.location`.
+- Parse HTML as a string; do not boot a DOM.
+
+### 15.1 Out-of-tree behavioural checks
+
+```bash
+python3 -m http.server 8899 --bind 0.0.0.0 &     # repo root
+cd /tmp/verify && npm i jsdom@24                  # throwaway, never committed
+```
+
+Mandatory harness details: `process.on("unhandledRejection", () => {})` (jsdom surfaces page errors as
+rejections and would kill the process), `resources: "usable"`, `pretendToBeVisual: true`, wait for
+`load` + ~300 ms, and filter the expected noise (`MessagePort`, service-worker registration, CDN
+failures for `lucide`/`marked`/`io`/Tailwind, WebGL/`canvas.getContext()`, particles).
+
+There is no Chromium or Playwright here: **proxy traffic cannot be exercised end to end**. Say what was
+and was not covered; never call a proxy fix "verified" on jsdom evidence alone.
+
+---
+
+## 16. Security and privacy model
+
+What the project actually promises, and where each promise is implemented:
+
+| Promise | Implementation | Where it can break |
+| --- | --- | --- |
+| Query strings are never recorded | `GraipLog.safeUrl()` strips query + fragment; `describeRequest()` in `sw.js` does the same | A new log call passing a raw `location.href` |
+| TLS verification is never disabled | The libcurl bundle keeps peer verification; curl 60 is surfaced, not bypassed | Editing the WASM/CA bundle or the transport flags |
+| A panic leaves no destination behind | `history.replaceState` in `panic.html`, `clearTabSession()`, `scrubDocumentUrl()` | Storing the URL elsewhere (do not) |
+| A config file cannot inject code | `settings-io.js` type validation (`url`/`wisp`/`token` regexes) | Assigning imported values to `href`/`src` without validation |
+| Cloaking does not leak the real title | `cloak.js` sets title/icon on load; `panic.html` opts out of auto-cloak | A page that overrides `document.title` after load |
+| Proxied traffic is never cached | `sw.js` `isProxyPath()` guard | Adding a cache-first branch for `/~/sj/` |
+| No account, no server-side state | Nothing but static assets | Adding a backend call that sends URLs anywhere |
+
+Known gaps, stated plainly: there is **no CSP** (the shell injects inline scripts by design), the site
+loads an Umami analytics tag and a dead visitor counter in `index.html`, and `start.html` plus the
+`og:image` meta still contain upstream author metadata. The debug log is capped and redacted but it is
+still a record of *what the user did* (not where) — treat an exported log as personal data.
+
+---
+
+## 17. Performance notes
+
+- **Shell payload**: `index.html` 1,654 lines (83 KB) + `styles/index.css` (1,763 lines, 34 KB) + ~9
+  first-party scripts.
+  `assets/js/lib/three.min.js` (26,887 lines) and `vanta.fog.min.js` are the heaviest first-party
+  downloads and are only on `index.html`; the fog toggle exists to let users drop them.
+- **Lazy everything**: tabs restore lazily (`restoreUrl`), thumbnails load through an
+  IntersectionObserver probe, the libcurl transport is a dynamic `import()`, bare-mux is created on
+  first use, and `scratch` Scramjet frames are created per tab on demand.
+- **Caching**: `/assets/*` gets a 7-day `Cache-Control` on Vercel (`vercel.json`), the worker serves
+  the shell network-first with a cache fallback, and `sw.js` itself is `must-revalidate` so a deploy
+  lands.
+- **Avoid**: adding more vendored libraries to the shell, eagerly probing all 30 Wisp endpoints, or
+  making the shell wait on anything other than the three boot promises in `go()`.
+
+---
+
+## 18. Browser and environment support
+
+| Environment | Notes |
+| --- | --- |
+| Chromium (Chrome, Edge, Chromebooks) | The primary target; service workers, `about:blank` windows and PWA install all work |
+| Firefox | `sw.js` has a shim that defines `crossOriginIsolated = true`; Scramjet needs it |
+| Safari / iOS | Service worker + standalone mode work; `about:blank` popups are more restricted, so auto-cloak may be blocked by the popup blocker |
+| Incognito / private | `localStorage` may be unavailable at the end of the session; every storage access is wrapped |
+| No WebGL | The Vanta fog is wrapped in `try/catch` and logs `ui` → `fog background unavailable` |
+| Filtered network | The shell boots from the cache; CDN scripts fail and every feature that needs one checks its global first |
+| No service worker | The site loads, but `go()` cannot proxy: it waits, then reports "Proxy unavailable" |
+
+---
+
+## 19. Deploy and release
+
+- **Any static host**. Root deployment only: the worker must live at `/sw.js` with
+  `Service-Worker-Allowed: /`. A project subpath breaks it.
+- **Vercel**: `vercel.json` sets the manifest MIME type, `sw.js` no-cache + `Service-Worker-Allowed`,
+  `/assets/*` 7-day cache, `nosniff` and `no-referrer`. No build, no rewrites.
+- **Cloudflare Pages**: 25 MB per-file limit forces the GN-Math store only; the Classplay game files do
+  not fit (`MOVING.md` records this).
+- **Release checklist**: bump the version in `index.html` (`graip_siteVersion` triggers the "was
+  updated" toast), bump `SHELL_CACHE` if `SHELL_ASSETS` or shell behaviour changed, run the tests,
+  update `README.md` + `AGENTS.md`.
+- The nightly `.github/workflows/sync-fork.yml` force-syncs the **default branch** from the upstream
+  parent. Never do fork work on `main`.
+
+---
+
+## 20. Debugging cookbook
+
+| Symptom | First check | Then |
+| --- | --- | --- |
+| Sites never load, tab says "Proxy unavailable" | Settings → Debug: is there a `wisp` error? | Settings → Proxy → *Test current server*, then *Test all Wisp routes* |
+| Tab loads but the frame is the host's 404 | `navigator.serviceWorker.controller` — no controller means the worker is not intercepting | Reload, or *fixProxy*, or check the worker scope |
+| Every request returns `Site Blocked` | `CONFIG.blocked` in `sw.js` matched the destination | Narrow the pattern; the log names the host |
+| `error code 60` | Which host? Is it only that host? | Compare a known-good site; try one other route to prove it is route-specific; never disable verification |
+| Log panel is empty | Is `log.js` loaded before the page's own scripts? | `GraipLog.entries().length` in the console; check that verbose is on |
+| A page's JS silently stops halfway | An uncaught `TypeError` in the same `<script>` block | Console, then guard the lookup (`if (!el) return`) |
+| Settings do not apply after import | Import reloads the page; a failed import shows the reason in `#settings-import-status` | Preview the file, check the per-key skip reasons |
+| Panic does nothing | Toggle off? Typing in an input? Modifier held? | `GraipCloak.matches(event)` in the console |
+| Images all show placeholders | `graip_libraryIssues` in storage | Settings → Debug → *Check library now* |
+| Stale assets after deploy | Service worker serving the old shell | Bump `SHELL_CACHE`; DevTools → Application → Service Workers → Update |
+
+Console one-liners that answer most questions:
+
+```js
+GraipLog.entries().slice(-20)          // what just happened
+GraipWisp.getConfiguredUrl()           // what the user chose
+GraipWisp.getActiveUrl()               // what answered last
+GraipCloak.settings()                  // panic/cloak state
+GraipSettings.collect()                // every backed-up setting
+JSON.parse(localStorage.graip_tabs__)  // (see §6.2 for the real key: pathname-suffixed)
+navigator.serviceWorker.controller     // null means the proxy cannot intercept
+```
+
+---
+
+## 21. Conventions and invariants
+
+**Style.** Plain browser JS; no modules except `import("/libcurl/libcurl.mjs")`; no TypeScript; no
+framework. 2-space indent in `assets/js`, 4-space in HTML, tabs in `sw.js` and vendored files. Match the
+file you are in — the repo has three styles and that is fine.
+
+**Comments.** Explain *why* a workaround exists, not what the next line does. The existing comments are
+the reason this codebase is maintainable.
+
+**Copy.** Lowercase, short, sentence-cased, no trailing period on buttons ("Test current server").
+Never describe public Wisp endpoints as official or reliable.
+
+**Code invariants.**
+
+1. Shared scripts must survive missing DOM and missing globals.
+2. Proxy navigation only through `go()`; never assign a proxied `iframe.src` by hand.
+3. Same-origin page navigation only through `navTo()`; every `pages/*.html` reference must exist.
+4. Settings reads/writes in bulk only through `GraipSettings`; single values through their owning
+   module (`GraipCloak.KEYS`, `GraipWisp.KEYS`, …).
+5. Log through `GraipLog`; never add a second logging path.
+6. New user-visible actions and every failure path get a log line.
+7. New toggles mount through `.graip-toggle-slot` + `debug-panel.js`; do not copy the switch markup.
+8. Mobile CSS lives only inside media queries.
+9. `sw.js` never caches proxied or cross-origin responses.
+10. Any change to a URL, title or storage key updates this document.
+
+---
+
+## 22. Traps
+
+- Dead third-party endpoints: `api.x8r.dev` (visitor counter, CometChat tokens, Hyperbeam),
+  `qs03x443-3000.usw3.devtunnels.ms` (chat socket). Features on them must degrade with a visible
+  message; `index.html` shows the pattern (dash + one log entry + stop polling).
+- TMDb host is `api.themoviedb.org`; `api.tmdb.org` does not serve the API. Streams come from
+  `iframe.pstream.mov`, `multiembed.mov`, vidsrc.
+- CDN dependencies (Alpine, Tailwind, `marked`, `lucide`, KaTeX, `socket.io`, `emoji-mart`, `eruda`)
+  fail on filtered networks — check the global before use.
+- `stores/ucp-games/*`, `homework/math.all.js`, `assets/icons/fonts/index.html`, `start.html`,
+  `pages/classroom.html` are huge vendored files: greps and diffs against them are noise.
+- `start.html` contains an upstream `og-profile-acct` Gmail address; `index.html` still points
+  `og:image`/`twitter:image` at `https://cherri.x8r.dev`. Both are upstream leftovers.
+- Single-commit `main` history: diff against `https://github.com/x8rr/cherri` (shallow clone).
+- The nightly sync workflow forcibly syncs the default branch — never work on `main`.
+- `tests/site-wiring.test.js` enforces invariants that were broken once already: the Movies tab opens
+  the built-in page, side menus deep-link to `/?launch=1&settings=1`, every nav/settings target exists,
+  no `/pages/*.html` reference is missing.
+- Regenerating anything in `libcurl/` by hand is forbidden; rebuild from the packages and re-run the
+  bundle test.
+
+---
+
+## 23. Repo sweep findings
+
+A full pass over every first-party file and every vendored tree. Fifteen findings, all real, none
+blocking. #5 and #15 are **fixed**; the rest are documented behaviour.
+
+1. **`assets/js/chatrooms.js` is dead code** — no page includes it; `chatrooms.html` has its own
+   socket.io client.
+2. **`assets/js/lib/detectmobile.js` is only used by vendored GN-Math pages.**
+3. **`assets/css/themes/mint.css` exists but is not offered** — `allThemeOptions` in `dropdown.js`
+   lists 15 themes + `default`. Add `"mint"` there to expose it; `settings-io.js` already accepts it.
+4. **`assets/json/partners.json` is inconsistent** — the Hydra Network entry points at
+   `https://prism.onl/` and reuses `prism.png` although `hydra.png` exists; the Hydra tile in
+   `index.html` uses `hydra.png` directly.
+5. **~~`index.html` had a stray `</html>` inside `<head>`~~ — fixed.** It sat before the manifest and
+   `theme-color`/Apple meta tags, so the parser closed `<head>` early and pushed them into `<body>`;
+   the trailing `</head>` became a no-op. Removed, and `site-wiring.test.js` now fails if a `</html>`
+   reappears inside `<head>`, if `<head>` closes twice, or if the same `<script src>` is listed twice.
+6. **`pages/classroom.html` (37,761 lines) is unreachable** — a second Classroom copy from upstream;
+   `start.html` is the one that is shown.
+7. **`pages/gmbl.html` is only reachable by URL** — its sidebar entry is commented out.
+8. **Icon-font mismatch in the settings sidebar** — it asks for `far fa-cog`, `far fa-bug`,
+   `far fa-hood-cloak`, `far fa-bell-on`, but the bundled font is Font Awesome **Free**, so some icons
+   render blank. Use names that exist in `fa/css/all.min.css` (`fa-floppy-disk` does; `fa-cog` does not).
+9. **Two identical `beforeunload` handlers** in `index.html`; both honour `graip_skipLeaveGuard`. A
+   third guard must check it too.
+10. **`settings.js` is still loaded by 96 vendored store pages** — hence the optional-everything rule.
+11. **Visitor counter and chat endpoints are dead**; both now fail visibly.
+12. **`404.html` carries unreachable navigation JS** (`navTo`, `rSearch`, `toast`) — no nav and no
+    `#homesearch` input. `rSearch()` used to target the never-existing `/pages/ultraviolet.html`; it now
+    targets `pages/browser.html`, and a test fails on any missing `/pages/*.html` reference.
+13. **The fog background is the only WebGL dependency**; a `VANTA.FOG()` throw used to abort the rest of
+    that script block (counter, Wisp status, settings wiring). Now guarded.
+14. **No CI runs the tests.** The only workflow syncs the fork. A new workflow must stay
+    dependency-free (`node --test tests/*.test.js` needs nothing installed).
+15. **~~The Tailwind CDN was requested twice in `<head>`~~ — fixed in `index.html` *and*
+    `newtab.html`**, and the duplicate `<script src>` check in `site-wiring.test.js` now runs over every
+    first-party page, so the whole class of bug is pinned. Note that Tailwind's JIT CDN script is
+    still the first thing that runs on the shell, before `log.js`: a network stall there delays every
+    boot, which is why `log.js` installs `window.onerror` in the second script slot, not after it.
+
+---
+
+## 24. Playbooks
+
+**Add a settings toggle.** Panel markup → `<div class="graip-toggle-slot" data-slot="name"></div>`;
+`debug-panel.js` → `mountToggle("name", { id, checked, onChange })`; persist under a `graip_` key;
+add a `SCHEMA` row in `settings-io.js`; log the change; extend a test.
+
+**Add a select.** Prefer `<select id="…" class="settings-select">`; populate options from the owning
+module's table (`TARGETS`, `PANIC_KEYS`, …), never inline in markup.
+
+**Add a page.** Create `pages/<name>.html`, include `log.js` + `cloak.js` (+ `colors.js`, `t.js` as needed),
+add a `navTo('x')` entry **and** make sure the nav target exists (the wiring test checks both ways),
+add it to the jsdom smoke list, and document it in §4.
+
+**Add a cloak profile.** One entry in `GraipCloak.PROFILES` (title, icon, page kind). `dropdown.js`,
+`panic.html` and `about:blank` pick it up automatically. If it needs a new page kind, extend
+`decoyMarkup()`.
+
+**Add a Wisp preset.** One entry in `GraipWisp.PRESETS` with an `id`, a `name` and a trailing-slash URL.
+Do not add one you have not probed; do not promise uptime.
+
+**Add a log line.** `GraipLog.info("category", "what happened", { …safe fields })`. URLs go through
+`safeUrl`. User actions use `action()`.
+
+**Add a migration.** Follow `graip_searchEngineGoogleDefaultV1`: a version marker key, idempotent,
+guarded, and logged.
+
+**Change storage.** Update §6, the `settings-io.js` schema if it is a preference, and any test that
+asserts the key.
+
+---
+
+## 25. Review checklist
+
+- [ ] `node --test tests/*.test.js` → 107/107, and a test exists for the new behaviour
+- [ ] No new dependency, build step, or vendored file
+- [ ] Every new DOM lookup is guarded; every new page is loadable standalone
+- [ ] No site URL, token or query string reaches the log
+- [ ] New preference: `SCHEMA` row + README settings table + AGENTS §6
+- [ ] New action or failure path: a `GraipLog` line
+- [ ] Mobile changes only inside media queries
+- [ ] Proxy changes: no TLS downgrade, no caching of proxied responses, `go()` still the only path
+- [ ] `README.md` / `AGENTS.md` updated in the same commit
+- [ ] jsdom smoke run over the touched pages, with the coverage stated honestly
+
+---
+
+## 26. Fork delta versus upstream Cherri
+
+Kept for context; the authoritative list is `README.md` → FORK NOTICE.
+
+- Rebranded Cherri → graip (display text, storage keys, globals, titles); default theme `midnight`.
+- Wisp handling rewritten: real handshake probing, 30 presets, pooled failover that never overwrites
+  the user's choice, `chosen → fallback` labelling.
+- TLS failures classified and retried (curl 7/35/60) with explanations; verification stays on.
+- libcurl.js 0.7.5 + libcurl-transport 2.0.6, with a load timeout and `libcurl_abort` handling.
+- Panic key + blackout decoy page (`panic.html`), cloak profiles, auto-`about:blank`.
+- Exportable debug log (verbose on by default) and Debug/Backup settings panels.
+- Tab sessions restored after reload; omnibox shortcuts and bangs.
+- Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.
+- Library hygiene (placeholders + `graip_libraryIssues`), settings export/import.
+- Fixes: Movies tab opened an external site; settings sidebar blanked the panel; side-menu settings
+  links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
+  scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
+  threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
+- Added `tests/` (107 tests) and this handbook.
+
+---
+
+## Verifying this document
+
+Everything above is checkable from a clone:
+
+```bash
+wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line counts
+ls assets/css/themes | wc -l                                       # 16 themes
+ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
+  console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
+node --test tests/*.test.js | tail -3                              # 107 pass
+git ls-files | wc -l                                               # 8401
+```
+
+If a number here disagrees with the tree, the tree is right: fix the document in the same commit that
+changed the code.

@@ -56,6 +56,108 @@ HTTPS traffic through a [Wisp](https://github.com/MercuryWorkshop/wisp-protocol)
 > either a public one from the built-in list, or one you host yourself (see
 > [Self-hosting a Wisp server](#self-hosting-a-wisp-server)).
 
+## Why make it your main
+
+Most proxy sites are a proxy, *or* a games page, *or* a movie site, and they send you to a
+third domain for each. This one is meant to be the only tab you need:
+
+- **One address does everything.** The browser, the games, the apps and the movies are all inside
+  the same app, so you bookmark one thing and stay in it. Your open browser tabs survive
+  a reload — the same way a real browser's do — so an accidental F5 does not throw away the page you
+  were on.
+- **It answers the questions teachers ask.** The tab title and icon can claim to be Google Docs or
+  Classroom; one key (backslash by default) turns the tab into a page that looks like schoolwork for
+  the half-second a teacher is looking, then either replaces the tab or moves you to a neutral site.
+  While that decoy loads you see a plain **black screen**, not a flash of the proxy — the detail other
+  "panic buttons" get wrong. Nothing about your tabs is left in the address bar or in storage
+  afterwards.
+- **It works when the network gets worse.** Every other proxy site is a blank page the moment the
+  filter starts blocking it. graip registers a service worker, so the shell (menus, settings, the
+  proxy's own UI) is cached on your device: on a filtered or offline network the UI still boots and
+  tells you which Wisp route is down instead of showing a browser error page. You can also install it
+  as an app (browser menu → Install / Add to Home Screen), which is what most people actually want on
+  a Chromebook.
+- **It does not lie to you when something is broken.** Every action, every proxy request, every
+  failed thumbnail and every error is recorded in a **debug log** you can export as a file from
+  Settings → Debug. When a site will not load, the log says whether the route was down, TLS was
+  intercepted, or the destination itself refused — and you can hand that file to whoever maintains
+  your copy instead of describing a blank screen. Several of the built-in features are honest about
+  being dead (the chat, VM and AI pages depend on third-party services that no longer answer) and now
+  say so on screen rather than spinning forever.
+- **Your settings are yours.** No account, no sign-in, no analytics of what you browse (the debug log
+  strips query strings before it stores anything). Preferences live in your own browser and can be
+  saved to a file and restored on another machine — useful on school machines that wipe profiles, and
+  useful for setting up a friend.
+- **It is maintained like software.** There are 106 automated tests, a documented engineering
+  handbook (`AGENTS.md`), a changelog of what the fork fixed, and a licence that keeps it open
+  (AGPL-3.0). That is why a bug you report
+  can actually be fixed, which is not true of a site whose repository is a screenshot and a Discord
+  invite.
+- **You are not stuck with someone else's copy.** Deploy it yourself (the buttons at the top of this
+  page cover Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, Replit and Glitch), or
+  run it locally with one command. A copy you host is a copy nobody can quietly take down.
+
+## What it can't do
+
+No README is worth reading if it only sells. These are the real limits:
+
+- **A proxy needs a route out.** graip proxies through a public **Wisp** server. If your school
+  blocks WebSockets altogether, nothing client-side can fix it — the browser page will tell you so.
+  You can also host your own route (see
+  [Self-hosting a Wisp server](#self-hosting-a-wisp-server)); that is the only real answer on a
+  hostile network.
+- **Public Wisp endpoints are donated, not guaranteed.** They are community servers. They go down,
+  rate-limit, or disappear. graip tests them, falls back automatically, and shows you which one
+  answered, but it cannot make somebody else's server reliable.
+- **It is not invisible.** A determined administrator who logs DNS or sees a websocket to an unknown
+  host can tell something is happening. The cloaking features protect against a glance and against a
+  browser-history check, not against a packet-level audit.
+- **Some sites will still fail.** Certificate errors (error 60) come from the destination's chain,
+  your clock, or a filter intercepting TLS. graip refuses to disable certificate checking to "fix"
+  that, because doing so would put your logins at risk.
+- **The chat, VM and AI pages depend on third parties.** Chat needs an external socket server (dead
+  at the time of writing, and it says so), VMs embed browser.lol, and the AI talks to
+  pollinations.ai. Games, apps, movies and the browser are the parts that do not depend on anyone.
+- **Movies are streams from third-party embed sites.** They are not hosted here, quality varies, and
+  the metadata comes from TMDb, which needs a live connection.
+- **The site counts its own page views.** `index.html` loads an Umami analytics tag, and tries a
+  first-party visitor counter whose endpoint is dead. That is site traffic, not a record of what you
+  browse — but if you host your own copy and want neither, delete that tag and the dead counter
+  block.
+
+## First five minutes
+
+1. Open the site **with `?launch=1`** on the end of the address (`https://your-site/?launch=1`).
+   Without it you land on `start.html`, which is a deliberately dull Google Classroom lookalike — the
+   disguise, not the app. The `/` of a deployed copy redirects there on purpose.
+2. Press the **gear** in the sidebar → **Proxy**. Press *Test current server*. If it fails, pick
+   another route in the list and test again; the test only proves the route answered, not that every
+   site will load through it.
+3. Go to **Cloaking**. Choose a *Tab Cloak* (the title + icon your tab will claim), turn on **Auto
+   about:blank** if you want the site to live in a `about:blank` tab, and set up the **Panic key**:
+   pick the key, the destination (Classroom by default) and whether it replaces this tab. Press *Test
+   panic now* once so you know what it does before you need it.
+4. Go to **Backup** and press *Save settings file*. Keep it. School machines wipe browser storage, and
+   restoring the file brings every setting back in one step.
+5. Optional: browser menu → **Install app** (Chrome/Edge/Chromebook) so graip opens like a normal
+   application and keeps its offline shell.
+
+### Keyboard, in one table
+
+| Keys | What happens |
+| --- | --- |
+| `Ctrl/Cmd + L` | Focus the address bar |
+| `Ctrl/Cmd + T` | New tab |
+| `Ctrl/Cmd + W` | Close this tab |
+| `Ctrl + Tab` | Next tab |
+| `Ctrl/Cmd + Shift + T` | Reopen the last closed tab |
+| `Alt + ←` / `Alt + →` | Back / forward |
+| `!g cats`, `!ddg cats`, `!b`, `!yt`, `!w`, `!gh`, `!r` | Search a specific site from the address bar |
+| Panic key (default `\`) | Panic: decoy page, then your destination |
+
+Typing something with a dot in it goes to that site; anything else becomes a search with your chosen
+search engine.
+
 ---
 
 ## Features
@@ -302,6 +404,8 @@ proxy.example.com {
 | Redirected to a Classroom lookalike | You opened the site without `?launch=1` | Append `?launch=1` (that page is the disguise) |
 | Games list empty | A store JSON failed to load | Settings → Debug → Check library now |
 | Chat / VMs / AI do not connect | Their third-party backends are dead | Expected; the UI reports it instead of hanging |
+| Panic key does nothing | The panic toggle is off, or a letter key is being typed into a text box | Settings → Cloaking → enable it; letter keys (`z`, `q`) never fire while typing |
+| Every setting disappeared | Browser storage was cleared (school profile reset, private window) | Settings → Backup → restore your saved file |
 
 If none of that helps: **Settings → Debug → Export JSON** and attach the file to an issue. It contains
 no query strings and no page contents.

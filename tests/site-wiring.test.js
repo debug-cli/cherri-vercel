@@ -197,3 +197,26 @@ test("the visitor counter degrades instead of throwing when its endpoint is gone
   assert.match(block, /clearInterval\(userCountTimer\)/, "a dead endpoint should stop being polled");
   assert.match(block, /GraipLog/, "the failure must be recorded in the debug log");
 });
+
+test("the shell document head is well formed and does not load anything twice", () => {
+  // index.html carried a stray `</html>` in the middle of <head>: the parser
+  // treats it as "close head", so the manifest link and every apple-mobile-web-app
+  // meta silently landed in <body> and the real </head> became a no-op. The
+  // Tailwind CDN was also requested twice.
+  const home = read("index.html");
+  const head = home.slice(home.indexOf("<head>"), home.indexOf("</head>"));
+
+  assert.ok(head.length > 0, "index.html must have a <head> block");
+  assert.ok(!/<\/html>/i.test(head), "a stray </html> inside <head> breaks document structure");
+  assert.ok(!/<\/head>/i.test(head.slice(0, -1)), "head is closed twice");
+  assert.match(head, /<link rel="manifest" href="\/manifest\.json">/);
+  assert.match(head, /name="theme-color"/);
+
+  // newtab.html had the same duplicated Tailwind request.
+  for (const page of PAGES) {
+    const source = read(page);
+    const srcs = [...source.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+    const dupes = [...new Set(srcs.filter((src, index) => srcs.indexOf(src) !== index))];
+    assert.deepEqual(dupes, [], `${page} loads the same script more than once: ${dupes.join(", ")}`);
+  }
+});
