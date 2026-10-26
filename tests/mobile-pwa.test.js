@@ -307,3 +307,22 @@ test("library_lists_are_well_formed", () => {
     }
   }
 });
+
+test("phone navigation fits a compact grid and toasts sit above the bottom bar", () => {
+  const css = read("styles/index.css");
+  const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
+  const toastCss = read("assets/css/t.css");
+  assert.match(phoneRules, /grid-template-columns:\s*repeat\(10,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(phoneRules, /height:\s*48px/);
+  assert.match(toastCss, /@media \(max-width: 640px\)[\s\S]*?\.toast-container\s*\{[\s\S]*?top:\s*auto !important;[\s\S]*?bottom:\s*calc\(48px/);
+});
+
+test("mobile home search icon sits inline with the placeholder and nav logo is centered", () => {
+  const css = read("styles/index.css");
+  const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
+  assert.match(phoneRules, /\.searchathome\s*\{[^}]*display:\s*flex/);
+  assert.match(phoneRules, /\.searchathome\s*\{[^}]*margin-inline:\s*auto/);
+  assert.match(phoneRules, /#homesearch\s*\{[^}]*flex:\s*1 1 auto/);
+  assert.match(phoneRules, /nav ul li:first-child a\s*\{[^}]*margin:\s*0 !important/);
+  assert.match(phoneRules, /nav ul li:first-child img\s*\{[^}]*margin:\s*0 !important/);
+});

@@ -130,6 +130,14 @@ li.toright {
     z-index: 1;
 }
 
+#homeContent h1 {
+    display: block;
+    line-height: 1.15;
+    margin: 0;
+    padding: 0 0.08em 0.08em;
+    overflow: visible;
+}
+
 #homeContent.hidden {
     display: none;
 }
@@ -249,11 +257,17 @@ nav ul li.disabled {
 
 .settings-sidebar {
     width: 25%;
-    padding: 2px;
+    height: calc(50vh - 12px);
+    max-height: calc(100% - 20px);
+    padding: 2px 2px 58px;
     position: relative;
     left: 0;
     margin: 4px;
     top: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
 }
 
 .settings-section {
@@ -588,6 +602,48 @@ p a:hover {
     transition: 0.2s;
     transform-origin: center center;
 }
+
+.special-thanks-title {
+    margin: 4px 0 16px;
+    text-align: center;
+    font-size: clamp(24px, 4vw, 35px);
+    color: var(--bright-text);
+    font-weight: 500;
+}
+
+.special-thanks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 12px;
+    width: 100%;
+    height: calc(100% - 62px);
+    overflow-y: auto;
+    align-content: start;
+    padding: 4px;
+}
+
+.special-thanks-card {
+    min-height: 136px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-2) 55%, transparent);
+    color: var(--text);
+    text-align: center;
+    text-decoration: none;
+    transition: transform .18s ease, background .18s ease;
+}
+
+.special-thanks-card:hover { transform: translateY(-2px); background: var(--bg-3); }
+.special-thanks-card img { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; }
+.special-thanks-card span { font-size: 13px; font-weight: 600; }
+.special-thanks-tools { grid-column: 1 / -1; flex-direction: row; min-height: 80px; }
+.special-thanks-tools i { font-size: 26px; flex: 0 0 auto; }
 
 .partners-wrapper {
     position: fixed;
@@ -1602,39 +1658,68 @@ span.online-count {
 
 @media (max-width: 640px) {
 
-    /* nav: the floating pill becomes a full-width bottom bar */
+    /* Compact 10-column bottom toolbar: fixed-width items used to overlap
+       when their combined width exceeded a phone's CSS viewport. */
     nav {
+        box-sizing: border-box;
         left: 0;
         right: 0;
         bottom: 0;
         top: auto;
         margin: 0;
         width: 100%;
-        height: 58px;
-        border-radius: 18px 18px 0 0;
+        height: 48px;
+        border-radius: 14px 14px 0 0;
         transform: none;
-        padding-left: 0;
-        padding-right: 0;
+        padding: 2px 4px;
     }
 
     nav ul {
-        justify-content: space-evenly;
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 1px;
         width: 100%;
         height: 100%;
         align-items: center;
+        justify-items: stretch;
     }
 
     nav ul li {
-        width: 44px;
-        height: 44px;
+        box-sizing: border-box;
+        width: auto;
+        min-width: 0;
+        height: 38px;
+        aspect-ratio: auto;
         margin: 0;
-        margin-top: 0;
-        flex: 0 0 auto;
+        flex: initial;
+    }
+
+    nav ul li a {
+        width: 100%;
+        height: 100%;
+        justify-content: center;
     }
 
     nav ul li a i {
-        transform: translate(-50%, 4%);
-        font-size: 21px;
+        left: auto;
+        transform: none;
+        font-size: clamp(16px, 4.6vw, 19px);
+    }
+
+    nav ul li img {
+        max-width: 20px;
+        max-height: 20px;
+        object-fit: contain;
+    }
+
+    /* Cancel desktop-only inline offsets on the brand icon. */
+    nav ul li:first-child a {
+        margin: 0 !important;
+    }
+
+    nav ul li:first-child img {
+        height: 20px !important;
+        margin: 0 !important;
     }
 
     nav ul li.divider {
@@ -1657,6 +1742,30 @@ span.online-count {
         width: min(92vw, 355px);
     }
 
+    .searchathome {
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: min(92vw, 355px);
+        margin-inline: auto;
+        padding: 0 14px;
+    }
+
+    .searchathome > i {
+        flex: 0 0 auto;
+        margin: 0;
+    }
+
+    #homesearch {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+        box-sizing: border-box;
+        padding: 10px 0;
+        margin-right: 0 !important;
+    }
+
     /* settings: sidebar tabs on top, content below */
     .settings-container {
         width: 96vw;
@@ -1672,6 +1781,8 @@ span.online-count {
 
     .settings-sidebar {
         width: 100%;
+        height: auto;
+        max-height: none;
         flex-direction: row;
         overflow-x: auto;
         overflow-y: hidden;
@@ -1685,6 +1796,9 @@ span.online-count {
     .settings-sidebar::-webkit-scrollbar {
         display: none;
     }
+
+    .partners-wrapper { width: min(94vw, 500px); height: min(70vh, 620px); }
+    .special-thanks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .settings-section {
         white-space: nowrap;
@@ -1753,11 +1867,65 @@ span.online-count {
     }
 
     nav ul li {
-        width: 38px;
-        height: 38px;
+        height: 36px;
     }
 
     #homeContent {
         top: 40%;
     }
+}
+
+
+/* Reduced motion is user-controlled and applies to all shell animations/effects. */
+.graip-reduced-motion *,
+.graip-reduced-motion *::before,
+.graip-reduced-motion *::after {
+    animation-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+}
+
+.motion-feature.is-motion-disabled {
+    opacity: 0.48;
+    filter: grayscale(1);
+}
+
+.motion-feature.is-motion-disabled .switch,
+.motion-feature.is-motion-disabled input,
+.motion-feature.is-motion-disabled button,
+.motion-feature.is-motion-disabled select {
+    cursor: not-allowed;
+}
+
+.motion-disabled-note {
+    display: none;
+    margin: 6px 0 10px;
+    color: var(--text) !important;
+    font-size: 12px !important;
+}
+
+.motion-feature.is-motion-disabled .motion-disabled-note {
+    display: block;
+}
+
+/* Keep the new master toggle reachable by keyboard despite the legacy switch styling. */
+.switch input#reduce-motion-toggle {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+.switch:has(#reduce-motion-toggle:focus-visible) .slider {
+    outline: 2px solid var(--bright-text);
+    outline-offset: 3px;
 }

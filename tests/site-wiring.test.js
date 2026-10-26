@@ -249,3 +249,31 @@ test("the release version is 2.0.0 \"juice\" everywhere it is written", () => {
   // the shell cache name carries the release so a new build retires the old one
   assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v2";/);
 });
+
+test("special thanks lists the README credits and settings categories can scroll", () => {
+  const html = read("index.html");
+  const css = read("styles/index.css");
+  const thanks = html.slice(html.indexOf('class="partners-wrapper'), html.indexOf('<button id="reset-theme"'));
+  assert.match(thanks, /Special Thanks/);
+  for (const name of ["x8r · Cherri", "MercuryWorkshop", "ading2210", "Titanium Network", "waves.lat", "binbashbanana"])
+    assert.ok(thanks.includes(name), `missing credit ${name}`);
+  assert.doesNotMatch(thanks, /Prism|Hydra Network/);
+  assert.match(html, /class="settings-sidebar vflex"[^>]*aria-label="Settings categories"/);
+  assert.match(css, /\.settings-sidebar\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /#homeContent h1\s*\{[^}]*overflow:\s*visible/s);
+  assert.equal(fs.existsSync(path.join(ROOT, ".github/workflows/sync-fork.yml")), false);
+});
+
+test("reduced motion is persisted and disables related visual effects accessibly", () => {
+  const html = read("index.html");
+  const css = read("styles/index.css");
+  const script = read("assets/js/cursor.js");
+  assert.match(html, /id="reduce-motion-toggle"[^>]*onchange="updateReducedMotion\(\)"/);
+  assert.match(html, /data-motion-feature="fog"[\s\S]*?motion-disabled-note/);
+  assert.match(html, /data-motion-feature="cursor"[\s\S]*?motion-disabled-note/);
+  assert.match(html, /graip_reduceMotion/);
+  assert.match(html, /graip_particlesOn", "no"/);
+  assert.match(html, /graip_customCursor", "no"/);
+  assert.match(css, /\.graip-reduced-motion \*/);
+  assert.match(script, /graip_reduceMotion.*!== "yes"/);
+});

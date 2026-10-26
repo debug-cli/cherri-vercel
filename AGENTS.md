@@ -9,6 +9,12 @@ and the counts are reproducible with the commands in [Verifying this document](#
 
 ---
 
+## Changelog and version naming rule
+
+- Never add, edit, or invent a changelog entry unless the user explicitly asks to change the version name or number across the repository.
+- Never guess or hallucinate a version name or number. Use only the exact version string supplied by the user; do not create release entries for ordinary feature work or separate chats.
+- The README changelog groups work under version headings, not chat/PR headings. Append a release entry only as part of a user-requested repo-wide version change.
+
 ## 0. How to use this document
 
 | If you are… | Read |
@@ -28,7 +34,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (121 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (125 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -109,7 +115,6 @@ second).
 ├── MOVING.md                    12        legacy fork stub
 ├── LICENSE                              AGPL-3.0
 ├── .gitignore                   41
-├── .github/workflows/sync-fork.yml 21   nightly upstream sync of the default branch
 ├── docs/superpowers/plans/
 │   └── 2026-10-03-curl-60-wisp-scramjet-diagnosis.md
 │                                        historical investigation plan (curl 60 / Wisp)
@@ -133,7 +138,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  121 dependency-free tests
+└── tests/                     13 files  125 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -505,7 +510,7 @@ There is also a one-time migration: `graip_searchEngineGoogleDefaultV1` rewrites
 
 Backend-free settings backup. Full format spec in §11. Structural notes:
 
-- `SCHEMA` (22 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
+- `SCHEMA` (24 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
   `graip_tabs*` is skipped by prefix.
 - `sanitize(entry, raw)` is the only writer path and returns `{ ok, value }` / `{ ok: false, reason }`.
 - `apply(input)` merges: absent keys untouched, `null`/`""` on optional keys ignored, unchanged values
@@ -560,6 +565,7 @@ Never write a `cherri_*` key.
 | Key | Values | Written by | Read by | In backup? |
 | --- | --- | --- | --- | --- |
 | `graip_theme` | `midnight`, `void`, `ocean`, `forest`, `ember`, `dunes`, `lavendar`, `coral`, `golden`, `lime`, `magenta`, `neon`, `royal blue`, `sea`, `violet`, `mint`, `default` | `dropdown.js`, `settings.js` | `colors.js`, `settings.js`, `dropdown.js`, `index.html` | ✅ |
+| `graip_reduceMotion` | `yes`/`no` | `index.html` (`updateReducedMotion`) | `index.html`, `styles/index.css`, `assets/js/cursor.js` | ✅ |
 | `graip_particlesOn` | `yes`/`no` | `index.html` (`updatePJS`) | `index.html` | ✅ |
 | `graip_customCursor` | `yes`/`no` | `index.html` (`updateCur`) | `cursor.js`, `index.html` | ✅ |
 | `graip_useOverlay` | `yes`/`no` | `index.html` | `index.html` | ✅ |
@@ -797,7 +803,7 @@ a JSON string. `MAX_BYTES` = 64 KiB.
 
 | Group | Keys | Type |
 | --- | --- | --- |
-| appearance | `graip_theme`, `graip_particlesOn`, `graip_customCursor` | token, bool, bool |
+| appearance | `graip_theme`, `graip_reduceMotion`, `graip_particlesOn`, `graip_customCursor` | token, bool, bool, bool |
 | proxy | `graip_wispUrlSelected`, `graip_wispUrlCustom`, `graip_backend`, `graip_searchEngine` | label, wisp (optional), token, token |
 | cloaking | `decoy`, `graip_cloakTitle`, `graip_cloakIcon`, `graip_cloakProfile`, `graip_panicEnabled`, `graip_panicKey`, `graip_panicTarget`, `graip_panicTargetUrl`, `graip_panicOpenIn`, `graip_panicShowDecoy`, `graip_autoAB` | label, text, url, label, bool, key, label, url, enum, bool, bool |
 | gaming | `graip_gameStore`, `graip_useOverlay`, `graip_confirmLeave` | token, bool, bool |
@@ -992,7 +998,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 121 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 125 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1096,11 +1102,11 @@ still a record of *what the user did* (not where) — treat an exported log as p
   `/assets/*` 7-day cache, `nosniff` and `no-referrer`. No build, no rewrites.
 - **Cloudflare Pages**: 25 MB per-file limit forces the GN-Math store only; the Classplay game files do
   not fit (`MOVING.md` records this).
-- **Release checklist**: bump the version in `index.html` (`graip_siteVersion` triggers the "was
-  updated" toast), bump `SHELL_CACHE` if `SHELL_ASSETS` or shell behaviour changed, run the tests,
-  update `README.md` + `AGENTS.md`.
-- The nightly `.github/workflows/sync-fork.yml` force-syncs the **default branch** from the upstream
-  parent. Never do fork work on `main`.
+- **Release checklist**: only change version strings when the user supplies the exact requested
+  version name/number and explicitly asks for the repo-wide update. On that request, update the
+  established version stamps, bump `SHELL_CACHE` if shell behaviour changed, run the tests, and add
+  one README changelog entry under that release heading. Never create chat/PR-specific entries.
+- Do not add an automated upstream sync workflow. Keep fork-specific work on the current Arena branch.
 
 ---
 
@@ -1134,6 +1140,14 @@ navigator.serviceWorker.controller     // null means the proxy cannot intercept
 ---
 
 ## 21. Conventions and invariants
+
+### Additional non-negotiable agent rules
+
+1. **Accessible UI:** new interactive elements need an accessible name, keyboard operation, visible focus, and a reduced-motion-safe presentation. Use native controls where possible.
+2. **Settings schema:** every new persistent setting must be added to `assets/js/settings-io.js` `SCHEMA`, wired into Settings and runtime behavior, documented in the settings reference, and covered by tests for validation/backup/import behavior.
+3. **Logging privacy:** add tests for logging changes that prove keyboard events and visited-site URLs or typed content are not captured; log only explicitly permitted operational endpoints (Wisp/API/server) when a URL is needed.
+4. **Unavailable controls:** when a setting or feature is disabled/grayed out because of another setting or condition, always show a short note directly beneath it explaining what the user must do to re-enable it. Keep the note hidden while the control is available.
+
 
 **Style.** Plain browser JS; no modules except `import("/libcurl/libcurl.mjs")`; no TypeScript; no
 framework. 2-space indent in `assets/js`, 4-space in HTML, tabs in `sw.js` and vendored files. Match the
@@ -1259,7 +1273,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 121/121, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 125/125, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1294,7 +1308,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (121 tests) and this handbook.
+- Added `tests/` (125 tests) and this handbook.
 
 ---
 
@@ -1307,8 +1321,8 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 121 pass
-git ls-files | wc -l                                               # 8401
+node --test tests/*.test.js | tail -3                              # 125 pass
+git ls-files | wc -l                                               # 8400
 ```
 
 If a number here disagrees with the tree, the tree is right: fix the document in the same commit that

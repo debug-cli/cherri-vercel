@@ -431,6 +431,19 @@ test("reset removes known settings but keeps the log and tabs", () => {
   assert.equal(localStorage.getItem("unrelated"), "keep");
 });
 
+test("reduced motion is a backed-up appearance setting", () => {
+  const { api } = load();
+  const setting = api.SCHEMA.find((entry) => entry.key === "graip_reduceMotion");
+  assert.deepEqual({ group: setting.group, label: setting.label, type: setting.type }, {
+    group: "appearance", label: "Reduce motion", type: "bool",
+  });
+  const imported = api.import({ graip_reduceMotion: "yes" });
+  assert.equal(imported.ok, true);
+  assert.equal(api.get("graip_reduceMotion"), "yes");
+  const backup = JSON.parse(api.exportJSON());
+  assert.equal(backup.settings.graip_reduceMotion, "yes");
+});
+
 test("every schema key is unique and covers the documented groups", () => {
   const { api } = load();
   const keys = api.SCHEMA.map((entry) => entry.key);
