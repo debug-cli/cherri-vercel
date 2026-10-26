@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width">
     <link rel="icon" type="image/svg+xml" href="/assets/img/fav.png">
     <title>graip</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="/uv/uv.bundle.js"></script>
     <script src="/uv/uv.config.js"></script>
     <script src="/baremux/index.js"></script>
@@ -24,8 +23,12 @@
     <link rel="stylesheet" href="/assets/css/t.css">
     <link rel="stylesheet" href="/assets/css/dropdown.css">
     <script src="/assets/js/cursor.js" defer></script>
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
     <script src="/assets/js/colors.js"></script>
     <script src="/assets/js/splash.js" defer></script>
+    <script src="/assets/js/debug-panel.js" defer></script>
+    <script src="/assets/js/settings-io.js" defer></script>
     <script src="/homework/english.bundle.js"></script>
     <script src="/assets/js/proxy-errors.js"></script>
     <script src="/assets/js/browserfunctions.js"></script>
@@ -57,7 +60,11 @@
     <link rel="stylesheet" href="/assets/css/font.css">
     <link rel="stylesheet" href="/assets/icons/fonts/remixicon.css">
 
-</html>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="graip">
 </head>
 
 <body>
@@ -87,7 +94,7 @@
                 </a>
             </li>
             <li>
-                <a href="https://stellar.gdn" data-page="movies">
+                <a onclick="navTo('movies')" href="#" data-page="movies">
                     <i class="ri-video-line"></i>
                 </a>
             </li>
@@ -181,7 +188,7 @@
                     <i class="far fa-gamepad-modern"></i>
                     Gaming
                 </div>
-                <div class="settings-section" onclick="switchSettingsPage('cloaking')" data-target="cloaks">
+                <div class="settings-section" onclick="switchSettingsPage('cloaking')" data-target="cloaking">
                     <i class="far fa-hood-cloak"></i>
                     Cloaking
                 </div>
@@ -193,7 +200,15 @@
                     <i class="far fa-info-circle"></i>
                     Info
                 </div>
-                <div class="settings-section" onclick="switchSettingsPage('updates')" data-target="info">
+                <div class="settings-section" onclick="switchSettingsPage('debug')" data-target="debug">
+                    <i class="far fa-bug"></i>
+                    Debug
+                </div>
+                <div class="settings-section" onclick="switchSettingsPage('backup')" data-target="backup">
+                    <i class="far fa-floppy-disk"></i>
+                    Backup
+                </div>
+                <div class="settings-section" onclick="switchSettingsPage('updates')" data-target="updates">
                     <i class="far fa-bell-on"></i>
                     Updates
                 </div>
@@ -339,15 +354,19 @@
                     </div>
 
                     <h2>about:blank</h2>
-                    <p>Create a new about:blank tab to hide Graip from your history and filter.</p>
-                    <button onclick="
-                        openAB()
-                    " class="button"><i class="ri-external-link-line"></i>&nbsp;Open in about:blank</button>
+                    <p>Open the site inside a new about:blank tab whose title and page match the disguise above, so
+                        this site never appears in history or in a filter's report.</p>
+                    <button onclick="openAB()" class="button"><i class="ri-external-link-line"></i>&nbsp;Open in
+                        about:blank</button>
                     <br><br>
-                    <h2>Auto Cloak</h2>
-                    <p>If this toggle is switched on, then as soon as the page loads, it will immediately open the
-                        about:blank cloaked page and redirect the main page to Google. Off by default.</p>
-                    <label class="switch">
+                    <h2>Auto about:blank</h2>
+                    <p>On every visit, move the site into an about:blank tab and send this tab to Google Classroom.
+                        Meant for filters that report the address you opened. Off by default.</p>
+                    <!--
+                        The panic toggle below is inserted by assets/js/debug-panel.js so it
+                        reuses this exact switch markup instead of duplicating 40 lines of SVG.
+                    -->
+                    <label class="switch" data-graip-toggle-host="auto-ab">
                         <input id="cloak-toggle" checked="" onchange="updateABSettings()" type="checkbox">
                         <div class="slider">
                             <div class="circle">
@@ -405,6 +424,124 @@
                             </div>
                         </div>
                     </label>
+                    <br><br>
+                    <h2>Panic Key</h2>
+                    <p>One key press hides what you were doing. The current tab is replaced by the destination below,
+                        and the page stays black until that site has finished loading, so the proxy is never shown.
+                        Press <b>Esc</b> on the decoy to come back.</p>
+                    <div class="graip-toggle-slot" data-slot="panic"></div>
+                    <p class="hint">Off by default. Keys like \ and Escape cannot be typed by accident.</p>
+
+                    <div id="panic-settings" class="panic-settings">
+                        <h3>Panic key</h3>
+                        <select id="panic-key" class="settings-select" aria-label="Panic key"></select>
+                        <h3>Panic destination</h3>
+                        <select id="panic-target" class="settings-select" aria-label="Panic destination"></select>
+                        <input id="panic-custom-url" class="wispInput" type="text"
+                            placeholder="https://classroom.google.com/" aria-label="Custom panic URL">
+                        <h3>When the key is pressed</h3>
+                        <select id="panic-open" class="settings-select" aria-label="Panic behaviour">
+                            <option value="same-tab">Replace this tab (nothing is left behind)</option>
+                            <option value="new-tab">Open a second tab (keeps this session)</option>
+                        </select>
+                        <div class="graip-toggle-slot" data-slot="panic-decoy"></div>
+                        <p class="hint">With the decoy on, the panic tab shows a stand-in page (Google Docs, Drive,
+                            YouTube…) instead of the real destination.</p>
+                        <button class="button" onclick="GraipPanicTest()">Test panic now</button>
+                    </div>
+
+                    <br><br>
+                    <h2>Session Traces</h2>
+                    <p>Graip remembers your open tabs for this window only, so a reload does not lose them. Clear them
+                        here (panicking already does this) and the address bar is reset too.</p>
+                    <button class="button" onclick="GraipClearTraces()">Clear session traces</button>
+
+                    <br><br><br>
+                </div>
+
+                <div id="settings-backup" class="settings-page">
+                    <h2>Backup &amp; Restore</h2>
+                    <p>Your settings live only in this browser. Save them to a file here and you can move them to
+                        another device, another deployment, or back again after clearing site data.</p>
+                    <p class="hint">The file holds preferences only — theme, cloak and panic options, Wisp route,
+                        search engine, game store and logging. It never contains your tabs, your history or the debug
+                        log.</p>
+
+                    <div class="hcontainer debug-buttons">
+                        <button class="button" onclick="GraipSettings.download()">
+                            Save settings file
+                        </button>
+                        <button class="button" onclick="GraipSettingsUiCopy(this)">
+                            Copy as JSON
+                        </button>
+                    </div>
+
+                    <h3>Restore from a file</h3>
+                    <input id="settings-import-file" type="file" accept="application/json,.json" hidden>
+                    <button class="button" id="settings-import-pick">
+                        Choose settings file…
+                    </button>
+                    <p class="hint">Only the settings inside the file are changed. Everything else stays as it is, so a
+                        two-line file is a valid partial restore.</p>
+
+                    <h3>Restore from text</h3>
+                    <textarea id="settings-import-text" class="settings-backup-textarea" spellcheck="false"
+                        placeholder='{"format":"graip-settings","version":1,"settings":{"graip_theme":"void"}}'
+                        aria-label="Settings JSON to import"></textarea>
+                    <button class="button" id="settings-import-paste">
+                        Import pasted settings
+                    </button>
+
+                    <pre id="settings-import-status" class="debug-preview">Nothing imported yet.</pre>
+
+                    <h3>What this device would export</h3>
+                    <pre id="settings-summary" class="debug-preview">reading settings…</pre>
+
+                    <h3>Reset</h3>
+                    <p class="hint">Removes every saved preference and goes back to the shipped defaults. Your log and
+                        your open tabs are untouched.</p>
+                    <button class="button" onclick="GraipSettingsUiReset(this)">
+                        Reset all settings
+                    </button>
+
+                    <br><br><br>
+                </div>
+
+                <div id="settings-debug" class="settings-page">
+                    <h2>Debug Log</h2>
+                    <p>Everything Graip does is recorded: pages loaded, proxy routes, Wisp probes, settings changes
+                        and every error. The log never stores query strings, and it stays on this device until you
+                        export or clear it.</p>
+
+                    <div class="graip-toggle-slot" data-slot="verbose"></div>
+                    <p class="hint">Verbose logging records routine actions and every proxied request. Turning it off
+                        keeps warnings and errors only. On by default.</p>
+
+                    <p><b>Status:</b> <span id="debug-status">checking…</span></p>
+
+                    <div class="hcontainer debug-buttons">
+                        <button class="button" onclick="GraipLog.download('json')">Export JSON</button>
+                        <button class="button" onclick="GraipLog.download('txt')">Export TXT</button>
+                        <button class="button" onclick="GraipLog.copy()">Copy</button>
+                        <button class="button" onclick="GraipLogClear()">Clear</button>
+                    </div>
+
+                    <h3>Wisp routes</h3>
+                    <p class="hint">Probe every known Wisp endpoint and record latency and the failure
+                        reason for each. Results go into the log above.</p>
+                    <button class="button" onclick="GraipProbeAll(this)">Test all Wisp routes</button>
+
+                    <h3>Recent entries</h3>
+                    <pre id="debug-preview" class="debug-preview">No entries yet.</pre>
+
+                    <br>
+                    <h2>Library Health</h2>
+                    <p>Thumbnails and links that failed to load in the Games and Apps menus. Broken entries are
+                        replaced with a placeholder instead of a blank tile.</p>
+                    <div id="library-health" class="debug-preview">Nothing reported. Reload the Games or Apps menu to
+                        check.</div>
+                    <button class="button" onclick="GraipCheckLibrary(this)">Check library now</button>
+
                     <br><br><br>
                 </div>
 
@@ -649,13 +786,23 @@
                 const aCont = document.querySelector(`.${type}-container`)
                 if (!aCont) return
 
+                let skipped = 0
+
                 items.forEach(item => {
+                    // Entries without a name or target are unusable; drop them
+                    // instead of rendering a tile that does nothing.
+                    if (!item || !item.name || !item.url) {
+                        skipped++
+                        noteLibraryIssue("entry", item && item.name ? item.name : "(unnamed)", type)
+                        return
+                    }
+
                     const newAppContainer = document.createElement("div")
 
                     newAppContainer.classList.add("app")
-                    newAppContainer.setAttribute("onclick", `toggle${functionName}();${toRun}('${additions}${item.url}'); console.log("asdflkjgasdfkljhgasdfkhgasfjkhgasfjkhgsdfgjh")`)
+                    newAppContainer.setAttribute("onclick", `toggle${functionName}();${toRun}('${additions}${item.url}')`)
                     newAppContainer.innerHTML = `
-                        <div class="bg-img" data-bg="${item.img}"></div>
+                        <div class="bg-img" data-bg="${item.img || ""}"></div>
                         <div class="app-title-cont">
                             <h2 class="app-title-h2">${item.name}</h2>
                         </div>
@@ -663,6 +810,10 @@
 
                     aCont.appendChild(newAppContainer)
                 })
+
+                if (skipped) {
+                    console.warn(`[graip] ${type} list: skipped ${skipped} incomplete entries`)
+                }
                 observe()
             }).catch(error => {
                 console.error(`[graip] ${type} list failed to load:`, error)
@@ -673,11 +824,58 @@
             })
         }
 
+        /**
+         * Library health: thumbnails that fail to load used to leave a blank tile
+         * with no explanation. The failure is remembered (for the Debug panel) and
+         * the tile gets a neutral placeholder instead.
+         */
+        const LIBRARY_ISSUES_KEY = "graip_libraryIssues"
+
+        function noteLibraryIssue(kind, name, detail) {
+            try {
+                const raw = localStorage.getItem(LIBRARY_ISSUES_KEY)
+                const list = raw ? JSON.parse(raw) : []
+                const next = Array.isArray(list) ? list : []
+                next.push({ kind, name, url: detail || "", at: new Date().toISOString() })
+                localStorage.setItem(LIBRARY_ISSUES_KEY, JSON.stringify(next.slice(-100)))
+            } catch (error) {
+                /* storage disabled: the console warning still goes out */
+            }
+            window.GraipLog && window.GraipLog.warn("library", `${kind} problem: ${name}`, { detail })
+        }
+
+        function showPlaceholder(el, name) {
+            el.classList.add("app-image-missing")
+            el.dataset.graipMissing = "1"
+            el.style.backgroundImage = "none"
+            // the title still shows, so the tile stays usable
+            const title = el.parentElement && el.parentElement.querySelector(".app-title-h2")
+            if (title) title.textContent = name || title.textContent
+        }
+
+        function applyThumb(el) {
+            const src = el.dataset.bg
+            if (!src) {
+                showPlaceholder(el, "Missing image")
+                return
+            }
+
+            const probe = new Image()
+            probe.onload = () => {
+                el.style.backgroundImage = `url('${src}')`
+            }
+            probe.onerror = () => {
+                showPlaceholder(el, "Image unavailable")
+                noteLibraryIssue("thumbnail", (el.parentElement && el.parentElement.textContent.trim()) || src, src)
+            }
+            probe.src = src
+        }
+
         const bgO = new IntersectionObserver(cards => {
             cards.forEach(c => {
                 if (c.isIntersecting) {
                     const el = c.target
-                    el.style.backgroundImage = `url('${el.dataset.bg}')`
+                    applyThumb(el)
                     bgO.unobserve(el)
                 }
             })
@@ -755,7 +953,9 @@
 
         window.addEventListener("load", () => {
             registerSW();
-            lucide.createIcons();
+            // lucide comes from a CDN: when a network filter blocks it the old
+            // unconditional call threw here and aborted the rest of this handler.
+            if (typeof lucide !== "undefined") lucide.createIcons();
         });
 
         const contentFrame = document.getElementById('contentFrame');
@@ -763,6 +963,7 @@
         const navLinks = document.querySelectorAll('nav a[data-page]');
 
         function navTo(l) {
+            window.GraipLog && window.GraipLog.action("nav", `open ${l}`)
             if (l.includes("home")) {
                 contentFrame.remove();
                 document.querySelector("nav").style.display = "block"
@@ -836,19 +1037,31 @@
         const allPages = document.querySelectorAll(".settings-page")
         const allButtons = document.querySelectorAll(".settings-section")
 
+        /**
+         * Show one settings panel and highlight its sidebar entry.
+         *
+         * The sidebar is the source of truth: `data-target` must match the real
+         * `#settings-<target>` id. Unknown targets are ignored so a bad
+         * data-target can never leave the content area blank, and deep links
+         * (/?launch=1&settings=1&section=proxy) land on the right panel.
+         */
         function switchSettingsPage(target) {
-            allPages.forEach(page => {
-                page?.classList.remove("settings-active")
-                document.querySelector(`#settings-${target}`)?.classList.add("settings-active")
+            const page = target ? document.querySelector(`#settings-${target}`) : null
+            if (!page) return
+
+            allPages.forEach(p => p.classList.remove("settings-active"))
+            page.classList.add("settings-active")
+            window.GraipLog && window.GraipLog.action("settings", `panel ${target}`)
+
+            allButtons.forEach(btn => {
+                const active = btn.dataset.target === target
+                btn.style.background = active ? "var(--bg-3)" : ""
             })
         }
 
         allButtons.forEach(button => {
             button.addEventListener("click", () => {
-                allButtons.forEach(btn => {
-                    btn.style.background = ""
-                    button.style.background = "var(--bg-3)"
-                })
+                switchSettingsPage(button.dataset.target)
             })
         })
 
@@ -1053,6 +1266,7 @@
         const pjsIsOn = localStorage.getItem("graip_particlesOn") ?? "yes"
 
         function updatePJS() {
+            window.GraipLog && window.GraipLog.action("settings", "toggle pjs")
             if (pjstoggle.checked) {
                 console.log("checked")
                 const newpjs = document.createElement("div")
@@ -1094,6 +1308,7 @@
         const overlayIsOn = localStorage.getItem("graip_useOverlay") ?? "yes"
 
         function updateOverlaySettings() {
+            window.GraipLog && window.GraipLog.action("settings", "toggle gameOverlay")
             if (overlayToggle.checked) {
                 console.log("checked")
                 showToast("success", "Game overlay is now on!", "fas fa-check-circle")
@@ -1127,29 +1342,42 @@
         })
 
         function resetTheme() {
+            window.GraipLog && window.GraipLog.action("settings", "theme reset to midnight")
             localStorage.setItem("graip_theme", "midnight")
             window.location.reload()
         }
 
+        /**
+         * Open this page inside an about:blank window whose title, favicon and
+         * visible page match the chosen disguise, then leave a neutral site here.
+         * The old version opened a bare window (so it was titled "about:blank",
+         * which looks wrong) and always redirected to Google.
+         */
         function openAB() {
             if (window.self !== window.top) return
+            if (window.GraipCloak) {
+                window.GraipCloak.openAboutBlank()
+                return
+            }
 
+            // cloak.js did not load: keep a minimal version working
             const win = window.open()
-            const url = window.location.href
+            if (!win) return
             const iframe = win.document.createElement('iframe')
             iframe.style.width = '100vw'
             iframe.style.height = '100vh'
             iframe.style.border = 'none'
             win.document.body.style.margin = '0'
-            iframe.src = url
+            iframe.src = window.location.href
             win.document.body.appendChild(iframe)
-            window.location.href = "https://google.com/"
+            window.location.replace("https://classroom.google.com/")
         }
 
         const abToggle = document.getElementById("cloak-toggle")
         const abOn = localStorage.getItem("graip_autoAB") ?? "no"
 
         function updateABSettings() {
+            window.GraipLog && window.GraipLog.action("settings", "toggle autoAboutBlank")
             if (abToggle.checked) {
                 console.log("checked")
                 showToast("success", "Auto cloaking is now on!", "fas fa-check-circle")
@@ -1167,8 +1395,10 @@
             abToggle.checked = false
         }
 
-        if (localStorage.getItem("graip_autoAB") === "yes") {
-            openAB()
+        // Auto about:blank runs at most once per tab, so reloading the cloaked
+        // copy does not spawn another window.
+        if (localStorage.getItem("graip_autoAB") === "yes" && window.self === window.top) {
+            window.GraipCloak && window.GraipCloak.autoAboutBlank()
         }
 
         const confirmLeaveOn = localStorage.getItem("graip_confirmLeave") ?? "no"
@@ -1181,6 +1411,7 @@
         }
 
         function updateCLSettings() {
+            window.GraipLog && window.GraipLog.action("settings", "toggle confirmLeave")
             if (confirmLeaveToggle.checked) {
                 console.log("checked")
                 showToast("success", "Confirm leave is now on!", "fas fa-check-circle")
@@ -1193,7 +1424,10 @@
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("graip_confirmLeave") === "yes") {
+            // The settings importer reloads on purpose; that reload must not ask
+            // "leave site?" just because the import turned the guard on.
+            if (localStorage.getItem("graip_confirmLeave") === "yes" &&
+                sessionStorage.getItem("graip_skipLeaveGuard") !== "1") {
                 e.preventDefault()
                 e.returnValue = ""
             }
@@ -1209,6 +1443,7 @@
         }
 
         function updateCur() {
+            window.GraipLog && window.GraipLog.action("settings", "toggle customCursor")
             if (cursorToggle.checked) {
                 console.log("checked")
                 showToast("success", "Custom cursor is now on!", "fas fa-check-circle")
@@ -1228,19 +1463,35 @@
         }
 
         window.addEventListener("beforeunload", function (e) {
-            if (localStorage.getItem("graip_confirmLeave") === "yes") {
+            // The settings importer reloads on purpose; that reload must not ask
+            // "leave site?" just because the import turned the guard on.
+            if (localStorage.getItem("graip_confirmLeave") === "yes" &&
+                sessionStorage.getItem("graip_skipLeaveGuard") !== "1") {
                 e.preventDefault()
                 e.returnValue = ""
             }
         })
 
         window.addEventListener("DOMContentLoaded", () => {
+            // one-shot flag set by the settings importer before it reloads
+            sessionStorage.removeItem("graip_skipLeaveGuard")
             const params = new URLSearchParams(window.location.search)
             if (!params.get("launch")) {
                 window.location.href = "/start.html"
             }
             if (params.get("page") && params.get("launch")) {
                 navTo(params.get("page"))
+            }
+            // Deep link to the settings panel. The menus inside pages/games.html,
+            // apps.html, partners.html and movieframe.html point here (with
+            // target="_top"), so their settings entry opens the real panel
+            // instead of a missing /pages/settings.html.
+            if (params.get("settings") && params.get("launch")) {
+                const settingsSection = (params.get("section") || "").trim()
+                toggleSettings()
+                if (settingsSection) {
+                    switchSettingsPage(settingsSection)
+                }
             }
         })
     </script>
@@ -1257,45 +1508,90 @@
 
         const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
         if (useFog === "yes") {
-            VANTA.FOG({
-                el: "#vanta-fog-container",
-                mouseControls: true,
-                touchControls: true,
-                gyroControls: false,
-                minHeight: 200.00,
-                minWidth: 200.00,
-                highlightColor: hexToNumber(cssVar("--accent")),
-                midtoneColor: hexToNumber(cssVar("--bg-2")),
-                lowlightColor: hexToNumber(cssVar("--bg-5")),
-                baseColor: hexToNumber(cssVar("--bg")),
-                blurFactor: 0.90,
-                speed: 1
-            })
+            // WebGL is missing on some school devices and in embedded webviews;
+            // an uncaught throw here used to abort the rest of this script block
+            // (visitor counter, Wisp status, the settings forms below).
+            try {
+                VANTA.FOG({
+                    el: "#vanta-fog-container",
+                    mouseControls: true,
+                    touchControls: true,
+                    gyroControls: false,
+                    minHeight: 200.00,
+                    minWidth: 200.00,
+                    highlightColor: hexToNumber(cssVar("--accent")),
+                    midtoneColor: hexToNumber(cssVar("--bg-2")),
+                    lowlightColor: hexToNumber(cssVar("--bg-5")),
+                    baseColor: hexToNumber(cssVar("--bg")),
+                    blurFactor: 0.90,
+                    speed: 1
+                })
+            } catch (error) {
+                // cosmetic effect only: say so in the log, keep the page working
+                window.GraipLog && window.GraipLog.warn("ui", "fog background unavailable", {
+                    error: (error && error.message) || String(error),
+                })
+            }
         }
 
-        async function getActiveUsers() {
-            const endpoint = "https://api.x8r.dev/api/umami"
-            const res = await fetch(endpoint)
-            const data = await res.json()
+        /**
+         * Visitor counter.
+         *
+         * The counter endpoint belonged to the upstream author's server and has
+         * been gone for a long time: an unguarded fetch here threw once on load
+         * and again every 30 s, which filled the debug log and left the number
+         * frozen at 0. A dead counter is cosmetic, so it now degrades to a dash
+         * and stops polling after three failures.
+         */
+        let userCountFailures = 0
+        let userCountTimer = null
 
-            console.log("CURRENT VISITORS:" + data.visitors)
-            document.getElementById("user-count").textContent = data.visitors
+        async function getActiveUsers() {
+            const el = document.getElementById("user-count")
+            try {
+                const res = await fetch("https://api.x8r.dev/api/umami")
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const data = await res.json()
+                if (!data || typeof data.visitors !== "number") throw new Error("unexpected payload")
+                userCountFailures = 0
+                if (el) el.textContent = String(data.visitors)
+                return data.visitors
+            } catch (error) {
+                userCountFailures++
+                if (el) el.textContent = "—"
+                window.GraipLog && window.GraipLog.debug("stats", "visitor counter unavailable", {
+                    attempt: userCountFailures,
+                    error: (error && error.message) || String(error),
+                })
+                if (userCountFailures >= 3) clearInterval(userCountTimer)
+                return null
+            }
         }
 
         getActiveUsers()
-
-        setInterval(() => {
-            getActiveUsers()
-        }, 30000)
+        userCountTimer = setInterval(getActiveUsers, 30000)
 
         function setWispStatus(text) {
             const el = document.getElementById("wispStatus")
             if (el) el.textContent = text
         }
 
+        /**
+         * Show the endpoint traffic is actually using. When an automatic
+         * fallback is in play the saved choice is still shown, because that is
+         * what the next load will try first.
+         */
         function setCurrentWispServer(url) {
             const el = document.getElementById("wispCurrentServer")
-            if (el) el.textContent = url || "Unknown"
+            if (!el) return
+
+            const fallback = typeof GraipWisp !== "undefined" && GraipWisp.getFallbackUrl
+                ? GraipWisp.getFallbackUrl()
+                : null
+
+            el.textContent = fallback && fallback === url
+                ? `${url} (automatic fallback; saved choice is retried on reload)`
+                : url || "Unknown"
         }
 
         // Keep the last custom URL ready when the user switches back to custom mode.
@@ -1304,7 +1600,7 @@
             wispInputEl.value = localStorage.getItem(GraipWisp.KEYS.custom) || ""
         }
         if (typeof GraipWisp !== "undefined") {
-            setCurrentWispServer(GraipWisp.getConfiguredUrl())
+            setCurrentWispServer(GraipWisp.getActiveUrl())
         }
         document.addEventListener("graipWispServerChanged", (event) => {
             setCurrentWispServer(event.detail)

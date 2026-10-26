@@ -13,6 +13,14 @@
     <script src="/assets/js/lib/particles.js"></script>
     <script src="/assets/js/colors.js"></script>
     <link rel="stylesheet" href="/assets/css/overlay.css">
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
+    <link rel="stylesheet" href="/assets/css/mobile.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="graip">
 </head>
 
 <body style="background: none !important;">
@@ -244,6 +252,9 @@
             console.log('Particles.js config loaded');
         });
 
+        // Neither page ships the sidebar markup (#nav-ul), so every reference to
+        // it has to be conditional: the old code threw on every logo click and on
+        // Ctrl+M, which also skipped the rest of the handler.
         const ul = document.getElementById("nav-ul")
 
         document.querySelectorAll("li a").forEach(link => {
@@ -255,7 +266,7 @@
 
         window.addEventListener("keydown", (e) => {
             if (e.ctrlKey && e.key === "m") {
-                console.log("Key pressed")
+                if (!ul) return
                 e.preventDefault()
                 if (!ul.classList.contains("active")) {
                     ul.classList.add("active")
@@ -269,7 +280,7 @@
                 } else {
                     ul.classList.remove("active")
                     const blurr = document.querySelector(".bluroverlay")
-                    blurr.remove()
+                    if (blurr) blurr.remove()
                 }
             }
         })

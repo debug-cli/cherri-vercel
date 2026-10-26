@@ -32,56 +32,20 @@ const storeSelector = document.querySelector(".store-selector");
 const storeSelected = storeSelector.querySelector(".store-selected");
 const storeOptions = storeSelector.querySelector(".store-options");
 
-const decoyPresets = {
-  Google: {
-    title: "Google",
-    icon: "https://www.google.com/favicon.ico",
-  },
-  "Google Docs": {
-    title: "Untitled document - Google Docs",
-    icon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon-2023q4.ico",
-  },
-  Youtube: {
-    title: "YouTube",
-    icon: "https://www.youtube.com/s/desktop/014dbbed/img/favicon_32x32.png",
-  },
-  "Google Drive": {
-    title: "My Drive - Google Drive",
-    icon: "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png",
-  },
-  "Khan Acadamy": {
-    title: "Khan Academy | Free Online Courses",
-    icon: "https://www.khanacademy.org/favicon.ico",
-  },
-  Canvas: {
-    title: "Dashboard | Canvas",
-    icon: "https://community.canvaslms.com/favicon.ico",
-  },
-  "Google Classroom": {
-    title: "Classroom",
-    icon: "https://ssl.gstatic.com/classroom/favicon.png",
-  },
-  "Delta Math": {
-    title: "Delta Math - Assignment",
-    icon: "https://www.google.com/s2/favicons?domain=deltamath.com&sz=256",
-  },
-  Microsoft: {
-    title: "Microsoft 365",
-    icon: "https://www.microsoft.com/favicon.ico",
-  },
-  Scratch: {
-    title: "Scratch - Imagine, Program, Share",
-    icon: "https://scratch.mit.edu/favicon.ico",
-  },
-  Billibilli: {
-    title: "Bilibili - Video Sharing Platform",
-    icon: "https://www.bilibili.com/favicon.ico",
-  },
-  Schoology: {
-    title: "Home | Schoology",
-    icon: "https://asset-cdn.schoology.com/sites/all/themes/schoology_theme/favicon.ico",
-  },
-};
+/**
+ * The disguise list lives in assets/js/cloak.js: it pairs a profile with the page
+ * that is rendered inside an about:blank window, and the panic page uses the same
+ * profiles. This file only renders it.
+ */
+const decoyProfiles =
+  typeof GraipCloak !== "undefined" && GraipCloak.PROFILES
+    ? GraipCloak.PROFILES
+    : { None: { title: "graip", icon: "/assets/img/fav.png", page: "none" } };
+
+const decoyPresets = {};
+for (const [name, preset] of Object.entries(decoyProfiles)) {
+  decoyPresets[name] = { title: preset.title, icon: preset.icon };
+}
 
 
 function closeAllSelectors() {
@@ -132,27 +96,24 @@ const allSearchEngineOptions = [
   "Bing",
   "Startpage",
 ];
-const allDecoyOptions = [
-  "None",
-  "Google",
-  "Google Docs",
-  "Youtube",
-  "Google Drive",
-  "Khan Acadamy",
-  "Canvas",
-  "Google Classroom",
-  "Delta Math",
-  "Microsoft",
-  "Scratch",
-  "Billibilli",
-];
+const allDecoyOptions = Object.keys(decoyPresets);
 
 const wispPresets = GraipWisp.PRESETS;
-const wispSelectablePresets = wispPresets.filter((preset) =>
-  ["Phantom", "Mercury", "Definitely Science 1", "Anura 1", "Terbium 1"].includes(
-    preset.id
-  )
-);
+// Every known endpoint is selectable. The old build exposed a hardcoded
+// five-name allowlist, so picking anything else (for example the RHW endpoint
+// that previous versions defaulted to) was impossible from the UI even though
+// the failover pool already used it.
+function wispPresetList() {
+  const local = typeof GraipWisp.localPreset === "function" ? GraipWisp.localPreset() : null;
+  const seen = new Set();
+  return [local, ...wispPresets].filter((preset) => {
+    if (!preset || seen.has(preset.url)) return false;
+    seen.add(preset.url);
+    return true;
+  });
+}
+
+const wispSelectablePresets = wispPresetList();
 const customWispOption = "Custom server…";
 const wispSelector = document.querySelector(".wisp-selector");
 const wispSelected = wispSelector.querySelector(".wisp-selected");
@@ -160,24 +121,23 @@ const wispOptions = wispSelector.querySelector(".wisp-options");
 const wispCustomSettings = document.querySelector(".wisp-custom-settings");
 const wispInput = document.querySelector(".wispInput");
 
+/**
+ * The preset the user picked. This is the *preference*, not whatever endpoint
+ * failover happened to use, so the dropdown never silently shows a different
+ * server than the one saved.
+ */
 function selectedWispPreset() {
   const selectedId = localStorage.getItem(GraipWisp.KEYS.preset);
-  if (selectedId === "Fallback" || selectedId === "Custom") return null;
+  if (selectedId === "Custom") return null;
+
+  const selected = wispSelectablePresets.find((preset) => preset.id === selectedId);
+  if (selected) return selected;
 
   const configured = GraipWisp.normalizeWispUrl(GraipWisp.getConfiguredUrl());
-  const configuredPreset = wispPresets.find((preset) => preset.url === configured);
-  if (configuredPreset && configuredPreset.id !== selectedId) return configuredPreset;
-  return wispPresets.find((preset) => preset.id === selectedId) || configuredPreset || null;
+  return wispSelectablePresets.find((preset) => preset.url === configured) || null;
 }
 
 function availableWispPresets() {
-  const selected = selectedWispPreset();
-  if (
-    selected &&
-    !wispSelectablePresets.some((preset) => preset.id === selected.id)
-  ) {
-    return [selected, ...wispSelectablePresets];
-  }
   return wispSelectablePresets;
 }
 
@@ -188,19 +148,28 @@ function updateWispSelector() {
     localStorage.getItem(GraipWisp.KEYS.custom)
   );
   const selection = localStorage.getItem(GraipWisp.KEYS.preset);
-  const isFallback = selection === "Fallback";
   const isCustom = selection === "Custom" && activeUrl === customUrl;
-  const label = preset
+  const fallbackUrl =
+    typeof GraipWisp.getFallbackUrl === "function" ? GraipWisp.getFallbackUrl() : null;
+  const fallbackPreset = fallbackUrl
+    ? wispSelectablePresets.find((entry) => entry.url === fallbackUrl)
+    : null;
+  const chosenLabel = preset
     ? preset.name
     : isCustom
       ? customWispOption
-      : isFallback
-        ? "Automatic fallback"
-        : wispPresets[0].name;
+      : wispPresets[0].name;
+
+  // Keep showing the saved choice, and append where traffic is going while an
+  // automatic fallback is active. Hiding the choice behind a generic
+  // "Automatic fallback" label made it look like the setting had been lost.
+  const label = fallbackUrl
+    ? `${chosenLabel} → ${fallbackPreset ? fallbackPreset.name : fallbackUrl}`
+    : chosenLabel;
 
   wispSelected.textContent = label;
   wispSelected.setAttribute("aria-expanded", "false");
-  wispCustomSettings.style.display = label === customWispOption ? "block" : "none";
+  wispCustomSettings.style.display = chosenLabel === customWispOption ? "block" : "none";
   if (wispInput) {
     wispInput.value = localStorage.getItem(GraipWisp.KEYS.custom) || "";
   }
@@ -233,6 +202,8 @@ function selectWisp(option) {
 
   const url = GraipWisp.setActiveServer(preset.url);
   if (!url) return;
+  // setActiveServer already saves preset ids it recognizes; this also covers
+  // the deployment-local /wisp/ endpoint.
   localStorage.setItem(GraipWisp.KEYS.preset, preset.id);
   GraipWisp.resetCache();
   updateWispSelector();
@@ -246,8 +217,12 @@ wispSelected.addEventListener("click", (event) => {
   if (wasOpen) return;
 
   wispOptions.innerHTML = "";
+  // filter against the saved choice, not the composed label (which may carry a
+  // "→ fallback" suffix)
+  const chosen = selectedWispPreset();
+  const chosenName = chosen ? chosen.name : customWispOption;
   [...availableWispPresets().map((preset) => preset.name), customWispOption]
-    .filter((name) => name !== wispSelected.textContent)
+    .filter((name) => name !== chosenName)
     .forEach((name) => {
       const option = document.createElement("div");
       option.textContent = name;
@@ -337,6 +312,9 @@ function createSelector(
                 })
               );
             if (successMsg) showToast("success", successMsg, "check-circle");
+            if (window.GraipLog) {
+              window.GraipLog.action("settings", `${selectorType} set to ${storageVal}`);
+            }
 
             if (storageKey === "cloakLink") {
               runMenuCloak();
@@ -351,28 +329,29 @@ function createSelector(
   });
 }
 
+/**
+ * Apply the chosen disguise. cloak.js owns the profiles and the storage keys, so
+ * this is a delegate (and still works if cloak.js is missing).
+ *
+ * @param {string} s profile name
+ */
 function applyDecoy(s) {
+  if (typeof GraipCloak !== "undefined" && GraipCloak.applyCloak) {
+    GraipCloak.applyCloak(s);
+    return;
+  }
+
   const selected = decoyPresets[s];
-  let favicon = document.querySelector("link[rel*='icon']");
+  const favicon = document.querySelector("link[rel*='icon']");
 
   if (s === "None" || !selected) {
-    console.log(
-      "Stayed as " +
-        favicon.href +
-        " " +
-        document.title +
-        " and " +
-        s +
-        " was selected"
-    );
     document.title = "graip";
-    favicon.href = "/assets/img/fav.png";
+    if (favicon) favicon.href = "/assets/img/fav.png";
     return;
-  } else {
-    document.title = selected.title;
-    favicon.href = selected.icon;
-    console.log("Set to " + favicon.href + " " + document.title);
   }
+
+  document.title = selected.title;
+  if (favicon) favicon.href = selected.icon;
 }
 
 createSelector(
@@ -446,6 +425,5 @@ document.addEventListener("wispUpdated", (e) => {
 });
 document.addEventListener("graipWispServerChanged", updateWispSelector);
 window.addEventListener("load", () => {
-  applyDecoy(localStorage.getItem("decoy"));
-  console.log("Cloaked as " + localStorage.getItem("decoy"));
+  applyDecoy(localStorage.getItem("decoy") || "None");
 });

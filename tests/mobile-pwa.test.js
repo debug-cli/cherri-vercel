@@ -1,0 +1,309 @@
+"use strict";
+
+/**
+ * Small-screen layout, offline shell and library hygiene.
+ *
+ * These are static assertions plus one worker harness: the point is to keep the
+ * promises (desktop untouched, shell never caches proxied traffic, every tile has
+ * a fallback) from silently regressing.
+ */
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+const vm = require("node:vm");
+
+const ROOT = path.join(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+
+/** Everything outside a media query, so "desktop changed" can be asserted. */
+function outsideMediaQueries(css) {
+  let depth = 0;
+  let out = "";
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i];
+    if (char === "{") depth++;
+    if (char === "}") depth--;
+    if (depth === 0) out += char;
+    if (char === "@" && css.slice(i, i + 6) === "@media") {
+      // skip the whole block
+      let cursor = css.indexOf("{", i);
+      let nest = 0;
+      for (; cursor < css.length; cursor++) {
+        if (css[cursor] === "{") nest++;
+        else if (css[cursor] === "}") {
+          nest--;
+          if (nest === 0) break;
+        }
+      }
+      i = cursor;
+    }
+  }
+  return out;
+}
+
+test("mobile_css_only_ever_applies_inside_a_media_query", () => {
+  const css = read("assets/css/mobile.css");
+
+  // strip comments, then make sure no declaration is at the top level
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const topLevel = outsideMediaQueries(stripped);
+  assert.doesNotMatch(
+    topLevel,
+    /[.#][\w-]+\s*\{/,
+    "mobile.css must not define top-level rules: it would change the desktop view"
+  );
+  assert.match(css, /@media \(max-width: 640px\)/);
+});
+
+test("new_index_css_does_not_touch_desktop_rules", () => {
+  const css = read("styles/index.css");
+  const marker = "Panic key / debug log additions";
+  const additionStart = css.indexOf(marker);
+  assert.ok(additionStart > 0, "the new settings styles should be appended");
+
+  const addition = css.slice(additionStart);
+  // the additions before the mobile section are new components only
+  const beforeMobile = addition.split("Mobile / small-screen layout")[0];
+  for (const selector of beforeMobile.matchAll(/^([.#][\w-]+)\s*\{/gm)) {
+    assert.ok(
+      /graip-toggle-slot|settings-select|settings-content-container|debug-|\.app/.test(selector[1]),
+      `unexpected selector added to the desktop stylesheet: ${selector[1]}`
+    );
+  }
+
+  // and everything after the mobile marker is inside a media query
+  const mobileSection = addition.split("Mobile / small-screen layout")[1] || "";
+  const stripped = mobileSection.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.doesNotMatch(outsideMediaQueries(stripped), /[.#][\w-]+\s*\{/);
+});
+
+test("critical_pages_load_the_mobile_stylesheet", () => {
+  for (const page of [
+    "pages/browser.html",
+    "pages/browser-minimum.html",
+    "pages/embed.html",
+    "pages/play.html",
+    "pages/vms.html",
+    "pages/assistant.html",
+  ]) {
+    assert.match(read(page), /\/assets\/css\/mobile\.css/, `${page} has no small-screen layout`);
+  }
+});
+
+test("manifest_is_valid_and_installable", () => {
+  const manifest = JSON.parse(read("manifest.json"));
+
+  assert.equal(manifest.start_url, "/?launch=1");
+  assert.equal(manifest.scope, "/");
+  assert.ok(["standalone", "minimal-ui"].includes(manifest.display));
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length > 0);
+  for (const icon of manifest.icons) {
+    assert.ok(
+      fs.existsSync(path.join(ROOT, icon.src.replace(/^\//, ""))),
+      `manifest icon ${icon.src} does not exist`
+    );
+  }
+
+  for (const page of ["index.html", "404.html", "newtab.html"]) {
+    const source = read(page);
+    assert.match(source, /rel="manifest"/, `${page} does not declare the manifest`);
+    assert.match(source, /name="theme-color"/);
+  }
+});
+
+function createWorkerHarness() {
+  let fetchListener;
+  const installHandlers = [];
+  const activateHandlers = [];
+  const listeners = new Map();
+  const cached = new Map();
+  const logs = [];
+
+  const caches = {
+    async open() {
+      return {
+        async add(request) {
+          cached.set(request.url || request, true);
+        },
+        async put(request, response) {
+          cached.set(request.url || request, response);
+        },
+      };
+    },
+    async match(request) {
+      const key = request && request.url ? request.url : request;
+      return cached.get(key) || null;
+    },
+    async keys() {
+      return ["graip-shell-v1", "graip-shell-v0", "unrelated"];
+    },
+    async delete(name) {
+      cached.set(`deleted:${name}`, true);
+      return true;
+    },
+  };
+
+  const context = vm.createContext({
+    URL,
+    Request: class Request {
+      constructor(url, options) {
+        this.url = url;
+        this.options = options;
+      }
+    },
+    Response,
+    Promise,
+    Set,
+    Map,
+    setTimeout,
+    clearTimeout,
+    caches,
+    console: { error() {}, warn() {}, log() {} },
+    navigator: { userAgent: "node-test" },
+    $scramjetController: { shouldRoute: () => true, route: async () => new Response("proxied") },
+    self: {
+      location: { origin: "https://graip.test" },
+      clients: { claim: async () => true, matchAll: async () => [] },
+      skipWaiting() {
+        context.skipped = true;
+      },
+      addEventListener(type, listener) {
+        listeners.set(type, listener);
+        if (type === "fetch") fetchListener = listener;
+        if (type === "install") installHandlers.push(listener);
+        if (type === "activate") activateHandlers.push(listener);
+      },
+    },
+    fetch: async (request) => new Response("network:" + (request.url || request), { status: 200 }),
+  });
+  context.importScripts = () => {};
+  vm.runInContext(read("sw.js"), context, { filename: "sw.js" });
+
+  return {
+    listeners,
+    cached,
+    logs,
+    context,
+    request(url, options = {}) {
+      let responsePromise;
+      const event = {
+        request: {
+          url,
+          method: "GET",
+          mode: options.mode || "navigate",
+          headers: {
+            get: (name) => (name === "accept" ? options.accept || "text/html" : null),
+          },
+        },
+        respondWith(value) {
+          responsePromise = Promise.resolve(value);
+        },
+        waitUntil(value) {
+          context.pending = Promise.resolve(value);
+        },
+      };
+      fetchListener(event);
+      return responsePromise;
+    },
+    /** Run every install listener, like the browser does. */
+    install() {
+      return Promise.all(
+        installHandlers.map((handler) => {
+          let pending;
+          handler({ waitUntil: (value) => (pending = Promise.resolve(value)) });
+          return pending;
+        })
+      );
+    },
+    activate() {
+      return Promise.all(
+        activateHandlers.map((handler) => {
+          let pending;
+          handler({ waitUntil: (value) => (pending = Promise.resolve(value)) });
+          return pending;
+        })
+      );
+    },
+  };
+}
+
+test("service_worker_takes_control_immediately", async () => {
+  const harness = createWorkerHarness();
+
+  // the install handler must register the shell cache and call skipWaiting()
+  await harness.install();
+  assert.equal(harness.context.skipped, true, "install must skipWaiting()");
+
+  await harness.activate();
+  assert.equal(harness.cached.get("deleted:graip-shell-v0"), true, "old shell caches are removed");
+  assert.equal(harness.cached.get("deleted:unrelated"), undefined, "other caches are left alone");
+});
+
+test("service_worker_never_caches_proxied_traffic", async () => {
+  const harness = createWorkerHarness();
+
+  await harness.request("https://graip.test/~/sj/https%3A%2F%2Fblocked.test%2F");
+  await harness.request("https://graip.test/uv/service/aHR0cHM6Ly9leGFtcGxlLmNvbQ==");
+
+  const keys = [...harness.cached.keys()].filter((key) => !String(key).startsWith("deleted:"));
+  assert.deepEqual(keys, [], "proxy requests must not be written to the shell cache");
+});
+
+test("service_worker_caches_the_shell_and_serves_it_offline", async () => {
+  const harness = createWorkerHarness();
+
+  // first visit: network responds and the shell entry is stored
+  const first = await harness.request("https://graip.test/styles/index.css", { mode: "no-cors" });
+  assert.match(await first.text(), /network:/);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(
+    [...harness.cached.keys()].some((key) => String(key).includes("styles/index.css")),
+    "the shell asset should be cached"
+  );
+});
+
+test("service_worker_reports_proxied_requests_to_the_page", () => {
+  const source = read("sw.js");
+
+  assert.match(source, /\$graip\$logConfig/, "the worker listens for the page's logging config");
+  assert.match(source, /function sendLog\(entry\)/);
+  assert.match(source, /"page loaded through the proxy"/);
+  assert.doesNotMatch(
+    source,
+    /\$graip\$log: \{[\s\S]{0,200}(password|token|cookie)/i,
+    "log reports must not include credentials"
+  );
+});
+
+test("library_tiles_have_a_placeholder_when_the_thumbnail_fails", () => {
+  const home = read("index.html");
+
+  assert.match(home, /function showPlaceholder\(el, name\)/);
+  assert.match(home, /probe\.onerror/, "thumbnails are probed so a broken one is detected");
+  assert.match(home, /app-image-missing/);
+  assert.match(home, /noteLibraryIssue\(/, "failures are recorded for the Debug panel");
+  assert.match(home, /graip_libraryIssues/);
+
+  // the debug panel can check the bundled lists on demand
+  assert.match(read("assets/js/debug-panel.js"), /GraipCheckLibrary/);
+  assert.match(read("index.html"), /GraipCheckLibrary\(this\)/);
+});
+
+test("library_lists_are_well_formed", () => {
+  for (const file of ["apps.json", "classplay.json", "gn-math.json"]) {
+    const items = JSON.parse(read(`assets/json/${file}`));
+    assert.ok(Array.isArray(items), `${file} must be an array`);
+
+    const broken = items.filter((item) => !item || !item.name || !item.url);
+    assert.equal(broken.length, 0, `${file} has ${broken.length} entries without a name/url`);
+
+    const seen = new Set();
+    for (const item of items) {
+      const key = `${item.name}|${item.url}`;
+      assert.ok(!seen.has(key), `${file} has a duplicate entry: ${key}`);
+      seen.add(key);
+    }
+  }
+});

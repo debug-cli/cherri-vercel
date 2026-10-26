@@ -46,6 +46,7 @@ function createServiceWorkerHarness(route) {
       request: {
         url: "https://graip.test/~/sj/https%3A%2F%2Fstellar.gdn%2F",
         mode,
+        method: "GET",
         headers: { get: (name) => (name === "accept" ? accept : null) },
       },
       respondWith(value) {

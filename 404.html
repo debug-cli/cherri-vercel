@@ -15,9 +15,16 @@
     <script src="/uv/uv.config.js"></script>
     <script src="/baremux/index.js"></script>
     <link rel="stylesheet" href="/styles/index.css">
-    <link rel="stylesheet" href="/assets/css/colors.css">
+    <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <script src="/assets/js/colors.js"></script>
     <link rel="stylesheet" href="/fa/css/all-pro.css">
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="graip">
 </head>
 
 <body>
@@ -74,7 +81,9 @@
 
         window.addEventListener("load", () => {
             registerSW();
-            lucide.createIcons();
+            // lucide comes from a CDN: when a network filter blocks it the old
+            // unconditional call threw here and aborted the rest of this handler.
+            if (typeof lucide !== "undefined") lucide.createIcons();
         });
 
         const contentFrame = document.getElementById('contentFrame');
@@ -115,7 +124,11 @@
 
             homeContent.classList.add('hidden');
             contentFrame.classList.add('active');
-            contentFrame.src = "/pages/ultraviolet.html?i=" + url;
+            // This pointed at /pages/ultraviolet.html, which has never existed
+            // in this repository. The markup no longer has a #homesearch input,
+            // so nothing calls this today -- but if the search box comes back it
+            // must land on the real browsing page, which takes ?launch=.
+            contentFrame.src = "/pages/browser.html?launch=" + encodeURIComponent(url);
             location.href = "#?i=" + url
         }
 

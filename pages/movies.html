@@ -15,6 +15,13 @@
     <link rel="stylesheet" href="/assets/css/colors.css" id="css-theme-link">
     <script src="/assets/js/colors.js"></script>
     <link rel="stylesheet" href="/assets/css/font.css">
+    <script src="/assets/js/log.js"></script>
+    <script src="/assets/js/cloak.js"></script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="graip">
 </head>
 
 <style>
@@ -74,6 +81,8 @@
 
         <br><br><br>
 
+        <p x-show="error" x-text="error" class="text-center text-[var(--text)] opacity-70 mb-4"></p>
+
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
             <template x-for="item in content" :key="item.id">
                 <a :href="'watch.html?id=' + item.id + '&type=' + (currentTab === 'movies' ? 'movie' : 'tv')"
@@ -109,6 +118,8 @@
                 currentTab: 'movies',
                 currentPage: 1,
                 searchQuery: '',
+                loading: false,
+                error: '',
 
                 async init() {
                     await this.fetchContent();
@@ -126,7 +137,7 @@
                         return;
                     }
 
-                    const baseUrl = 'https://api.tmdb.org/3';
+                    const baseUrl = 'https://api.themoviedb.org/3';
                     const endpoint = this.currentTab === 'movies' ? 'movie' : 'tv';
                     const url = `${baseUrl}/search/${endpoint}?api_key=${this.apiKey}&query=${encodeURIComponent(this.searchQuery)}&page=${this.currentPage}`;
 
@@ -143,14 +154,19 @@
                         }
 
                         const data = await response.json();
-                        this.content = data.results;
+                        this.content = data.results || [];
+                        this.error = '';
                     } catch (error) {
                         console.error('Error searching content:', error);
+                        this.content = [];
+                        this.error =
+                            'Could not reach TMDb. A network filter is probably blocking it — ' +
+                            'try again through the proxy.';
                     }
                 },
 
                 async fetchContent() {
-                    const baseUrl = 'https://api.tmdb.org/3';
+                    const baseUrl = 'https://api.themoviedb.org/3';
                     const endpoint = this.currentTab === 'movies' ? 'movie/popular' : 'tv/popular';
                     const url = `${baseUrl}/${endpoint}?api_key=${this.apiKey}&page=${this.currentPage}`;
 
@@ -167,10 +183,14 @@
                         }
 
                         const data = await response.json();
-                        this.content = data.results;
+                        this.content = data.results || [];
+                        this.error = '';
                     } catch (error) {
                         console.error('Error fetching content:', error);
-                        alert('Failed to load movies. TMDB API may be blocked by CORS. Try running this on a local server or use a CORS proxy.');
+                        this.content = [];
+                        this.error =
+                            'Could not reach TMDb. A network filter is probably blocking it — ' +
+                            'try again through the proxy.';
                     }
                 },
 

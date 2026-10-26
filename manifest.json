@@ -1,0 +1,49 @@
+{
+  "name": "graip",
+  "short_name": "graip",
+  "description": "A fast, clean unblocked games and web proxy site with a built-in browser, movie browser, and 700+ games.",
+  "id": "/?launch=1",
+  "start_url": "/?launch=1",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["games", "education", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/assets/img/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/img/fav.png",
+      "sizes": "160x160",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open the browser",
+      "short_name": "Browser",
+      "url": "/?launch=1&page=browser",
+      "description": "Start in the proxy browser"
+    },
+    {
+      "name": "Games",
+      "short_name": "Games",
+      "url": "/?launch=1&page=games",
+      "description": "Browse the game library"
+    },
+    {
+      "name": "Movies",
+      "short_name": "Movies",
+      "url": "/?launch=1&page=movies",
+      "description": "Browse movies and shows"
+    }
+  ]
+}
