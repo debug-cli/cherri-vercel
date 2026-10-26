@@ -45,7 +45,7 @@ function loadLog(overrides = {}) {
     URL,
     Blob: class Blob {},
     addEventListener() {},
-    document: {
+    document: overrides.document || {
       readyState: "complete",
       createElement: () => ({ click() {}, remove() {}, set href(value) {}, download: "" }),
       body: { appendChild() {} },
@@ -100,6 +100,26 @@ function loadCloak(overrides = {}) {
 }
 
 // ------------------------------------------------------------------ debug log
+
+test("ui_clicks_are_logged_without_destinations_or_keyboard_events", () => {
+  const listeners = {};
+  const doc = {
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+    createElement: () => ({ click() {}, remove() {}, set href(value) {}, download: "" }),
+    body: { appendChild() {} }, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null,
+  };
+  const { log } = loadLog({ document: doc });
+  const target = {
+    tagName: "A", textContent: "Open site", href: "https://visited.example/path",
+    closest: () => target, getAttribute: () => null,
+  };
+  listeners.click({ target });
+  const entry = log.entries().find((item) => item.category === "ui");
+  assert.ok(entry);
+  assert.match(entry.message, /Open site/);
+  assert.doesNotMatch(JSON.stringify(entry), /visited\.example/);
+  assert.equal(listeners.keydown, undefined);
+});
 
 test("log_is_on_by_default_and_records_actions", () => {
   const { log } = loadLog();

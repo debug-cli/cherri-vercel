@@ -519,6 +519,42 @@
           };
         }
 
+        // Record deliberate UI clicks across the shell, but never the clicked
+        // link destination or typed content. Keyboard events are intentionally
+        // not observed; this avoids recording keystrokes and visited websites.
+        if (global.document && global.document.addEventListener) {
+          global.document.addEventListener("click", (event) => {
+            try {
+              const target = event.target && event.target.closest
+                ? event.target.closest("button, a, [role=button], [role=tab], [onclick], .app, input[type=checkbox], input[type=radio], select, summary, .settings-section")
+                : null;
+              if (!target) return;
+              const label = (target.getAttribute("aria-label") || target.innerText || target.textContent || target.title || target.id || target.tagName || "control")
+                .replace(/\s+/g, " ").trim().slice(0, 100);
+              const safeLabel = /^https?:\/\//i.test(label) ? "link" : label;
+              log("debug", "ui", `clicked ${target.tagName.toLowerCase()}${safeLabel ? `: ${safeLabel}` : ""}`);
+            } catch (error) {
+              /* event logging must never disrupt the interface */
+            }
+          }, true);
+        }
+
+        // Record committed control changes (including keyboard-driven select or
+        // toggle changes) without observing key events or entered text.
+        if (global.document && global.document.addEventListener) {
+          global.document.addEventListener("change", (event) => {
+            try {
+              const target = event.target;
+              if (!target || !target.matches || !target.matches("input[type=checkbox], input[type=radio], select")) return;
+              const key = target.id || target.name || target.tagName.toLowerCase();
+              const value = target.type === "checkbox" || target.type === "radio" ? Boolean(target.checked) : String(target.value || "").slice(0, 80);
+              log("debug", "settings", `changed ${key}`, { value });
+            } catch (error) {
+              /* event logging must never disrupt the interface */
+            }
+          }, true);
+        }
+
         // Reports posted by sw.js (proxied requests, proxy failures).
         if (global.navigator && global.navigator.serviceWorker) {
           global.navigator.serviceWorker.addEventListener("message", (event) => {

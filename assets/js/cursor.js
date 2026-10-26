@@ -111,6 +111,6 @@ function removeCursor() {
   if (cursorStyle) cursorStyle.remove();
 }
 
-if (useCursor === "yes") {
+if (useCursor === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
   cursor();
 }

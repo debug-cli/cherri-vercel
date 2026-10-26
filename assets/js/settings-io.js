@@ -58,6 +58,7 @@
   const SCHEMA = [
     // ------------------------------------------------------------- appearance
     { key: "graip_theme", group: "appearance", label: "Theme", type: "token" },
+    { key: "graip_reduceMotion", group: "appearance", label: "Reduce motion", type: "bool" },
     { key: "graip_particlesOn", group: "appearance", label: "Fog", type: "bool" },
     { key: "graip_customCursor", group: "appearance", label: "Custom cursor", type: "bool" },
 
