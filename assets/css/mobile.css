@@ -136,9 +136,6 @@
         border-radius: 14px 14px 0 0;
     }
 
-    html body #particles-container {
-        display: none;
-    }
 }
 
 
@@ -147,7 +144,7 @@
 @media (max-width: 640px) {
     html body.assistant-page .messages-container {
         top: 68px;
-        bottom: 82px;
+        bottom: calc(110px + env(safe-area-inset-bottom, 0px));
         width: calc(100% - 16px);
         height: auto;
         box-sizing: border-box;
@@ -171,7 +168,7 @@
         position: fixed !important;
         left: 8px !important;
         right: 8px !important;
-        bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
         transform: none !important;
         z-index: 4;
         display: flex;
@@ -200,12 +197,12 @@
 @media (max-height: 600px) and (orientation: landscape) {
     html body.assistant-page .messages-container {
         top: 58px;
-        bottom: 68px;
+        bottom: 110px;
         height: auto;
         width: min(94vw, 760px);
     }
 
     html body.assistant-page > .container {
-        bottom: 8px !important;
+        bottom: 58px !important;
     }
 }

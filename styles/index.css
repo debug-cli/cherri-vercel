@@ -1772,7 +1772,7 @@ span.online-count {
 
     nav ul {
         display: grid;
-        grid-template-columns: repeat(9, minmax(0, 1fr));
+        grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: 1px;
         width: 100%;
         height: 100%;
@@ -2200,4 +2200,118 @@ span.online-count {
 .switch:has(#reduce-motion-toggle:focus-visible) .slider {
     outline: 2px solid var(--bright-text);
     outline-offset: 3px;
+}
+
+/* Shared small-screen launcher layout: compact, consistent squircle artwork for
+   both games and apps, with intrinsic grid sizing instead of the desktop cards. */
+@media (max-width: 900px) {
+    .apps-wrapper,
+    .games-wrapper {
+        box-sizing: border-box;
+        width: min(96vw, 720px);
+        height: min(82vh, 740px);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        overflow: hidden;
+        padding: 14px;
+    }
+
+    .apps-wrapper > br,
+    .games-wrapper > br { display: none; }
+
+    .apps-wrapper > #apps-search,
+    .games-wrapper > #games-search {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: block;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        width: 100% !important;
+        min-height: 42px;
+        margin: 0 0 12px !important;
+        padding: 10px 14px;
+        border-radius: 14px;
+    }
+
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-content: start;
+        justify-content: stretch;
+        gap: 10px;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 3px;
+        scrollbar-width: thin;
+        overscroll-behavior: contain;
+    }
+
+    .apps-container > br,
+    .games-container > br { display: none; }
+
+    .apps-container > .app,
+    .games-container > .game-launch-card {
+        position: relative;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-width: 0;
+        min-height: 0;
+        aspect-ratio: 1;
+        margin: 0 !important;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 25%;
+        background: var(--bg-2);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 1px 0 0 rgba(255,255,255,.2), 0 5px 14px rgba(0,0,0,.25);
+        outline: 1px solid rgba(255,255,255,.17);
+        outline-offset: -1px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .apps-container > .app::after,
+    .games-container > .game-launch-card::after {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,.24), rgba(255,255,255,.06) 14%, transparent 32%);
+    }
+
+    .apps-container > .app .bg-img,
+    .games-container > .game-launch-card .bg-img {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: inherit;
+        background-size: cover !important;
+        background-position: center;
+    }
+
+    .apps-container > .app .app-title-cont,
+    .games-container > .game-launch-card .app-title-cont { display: none !important; }
+}
+
+@media (max-width: 640px) {
+    .apps-wrapper,
+    .games-wrapper { width: 96vw; height: min(80vh, 720px); padding: 12px; }
+    .apps-wrapper > #apps-search,
+    .games-wrapper > #games-search { min-height: 40px; font-size: 14px; }
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container { gap: 8px; }
 }

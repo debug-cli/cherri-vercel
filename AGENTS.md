@@ -34,7 +34,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (132 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (134 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -138,7 +138,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  132 dependency-free tests
+└── tests/                     13 files  134 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -173,7 +173,7 @@ external). It is the app.
 | Line | Element | Role |
 | --- | --- | --- |
 | 73 | `#gohomeblock` | Floating "back to home" button shown while a page is open |
-| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, partners, settings, Discord. Chatrooms remains a direct page but has no sidebar button. The `gmbl` entry is commented out |
+| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, partners, settings. Chatrooms remains a direct page but has no sidebar button; Discord has no navigation button. The `gmbl` entry is commented out |
 | 156 | `#homeContent` | Hero: logo, splash text, search box, visitor count |
 | 179 | `#contentFrame` | The iframe every page loads into (`navTo`) |
 | 181 | `.settings-container.settings-hidden` | The settings sheet (fixed 625 px) |
@@ -1037,7 +1037,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 132 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 134 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1053,7 +1053,7 @@ node --test tests/*.test.js        # 132 tests, ~5 s, no dependencies, no networ
 | `page-bootstrap.test.js` | 11 | Every page boots with missing DOM/globals |
 | `site-wiring.test.js` | 10 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure, no duplicate `<script src>`, release version |
 | `panic-log.test.js` | 32 | Log filtering/redaction, panic matching/navigation, decoy structure, the return path (`returnUrl`/`leave` run against a fake document), `GraipShellState` capture/restore/resume, cloak profiles, tab restore, omnibox |
-| `mobile-pwa.test.js` | 15 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
+| `mobile-pwa.test.js` | 17 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
 | `settings-io.test.js` | 28 | Allowlist, validation, partial imports, reset, failure paths, panel wiring |
 
 Conventions that make these work — follow them, they cost nothing:
@@ -1312,7 +1312,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 132/132, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 134/134, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1347,7 +1347,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (132 tests) and this handbook.
+- Added `tests/` (134 tests) and this handbook.
 
 ---
 
@@ -1360,7 +1360,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 132 pass
+node --test tests/*.test.js | tail -3                              # 134 pass
 git ls-files | wc -l                                               # 8400
 ```
 

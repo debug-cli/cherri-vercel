@@ -312,7 +312,7 @@ test("phone navigation fits a compact grid and toasts sit above the bottom bar",
   const css = read("styles/index.css");
   const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
   const toastCss = read("assets/css/t.css");
-  assert.match(phoneRules, /grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(phoneRules, /grid-template-columns:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(phoneRules, /height:\s*48px/);
   assert.match(toastCss, /@media \(max-width: 640px\)[\s\S]*?\.toast-container\s*\{[\s\S]*?top:\s*auto !important;[\s\S]*?bottom:\s*calc\(48px/);
 });
@@ -371,10 +371,13 @@ test("chatroom button is removed and AI chat reserves space below the shell tool
   const mobile = read("assets/css/mobile.css");
   const shellCss = read("styles/index.css");
   assert.doesNotMatch(shell, /data-page="chatrooms"/);
-  assert.match(shellCss, /repeat\(9, minmax\(0, 1fr\)\)/);
+  assert.match(shellCss, /repeat\(8, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
   assert.match(assistant, /<body class="assistant-page">/);
   assert.match(mobile, /assistant-page \.messages-container\s*\{\s*top:\s*68px/);
   assert.match(mobile, /assistant-page > \.container\s*\{\s*position:\s*fixed/);
+  assert.match(mobile, /bottom: calc\(58px \+ env\(safe-area-inset-bottom/);
+  assert.doesNotMatch(mobile, /#particles-container\s*\{\s*display:\s*none/);
 });
 
 test("settings version fade remains confined to the category rail", () => {
@@ -385,4 +388,23 @@ test("settings version fade remains confined to the category rail", () => {
   assert.match(docs, /### 11\.2 Reading a settings JSON file/);
   assert.match(docs, /\| `graip_wispUrlCustom` \| User-supplied WebSocket endpoint/);
   assert.match(docs, /\| `graip_panicOpenIn` \| Whether panic opens in the same tab or a new tab/);
+});
+
+test("mobile apps share the compact squircle launcher grid and Discord is removed from navigation", () => {
+  const shell = read("index.html");
+  const css = read("styles/index.css");
+  assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
+  assert.match(css, /\.apps-wrapper > \.apps-container,[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.apps-container > \.app,[\s\S]*?aspect-ratio:\s*1/);
+  assert.match(css, /\.apps-container > \.app::after/);
+});
+
+test("movies page has independent responsive layout and bounded visible loading state", () => {
+  const movies = read("pages/movies.html");
+  assert.doesNotMatch(movies, /cdn\.tailwindcss|alpinejs/);
+  assert.match(movies, /class="movie-status"[\s\S]*?Loading movies/);
+  assert.match(movies, /AbortController\(\)/);
+  assert.match(movies, /movie-search/);
+  assert.match(movies, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(movies, /aria-pressed/);
 });
