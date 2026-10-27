@@ -19,8 +19,8 @@
   <b>Deploy in one click</b><br>
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Vercel" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/vercel.svg" height="40"></a>
   <a href="https://app.netlify.com/start/deploy?repository=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Netlify" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/netlify.svg" height="40"></a>
-  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create"><img alt="Deploy to Cloudflare Pages" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/cloudflarepages.svg" height="40"></a>
-  <a href="https://github.com/debug-cli/cherri-vercel/fork"><img alt="Deploy to GitHub Pages" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/github.svg" height="40"></a>
+  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create"><img alt="Deploy to Cloudflare Pages" src="https://img.shields.io/badge/Deploy_to-Cloudflare_Pages-F38020?logo=cloudflare&logoColor=white&style=for-the-badge" height="40"></a>
+  <a href="https://github.com/debug-cli/cherri-vercel/fork"><img alt="Deploy to GitHub Pages" src="https://img.shields.io/badge/Deploy_to-GitHub_Pages-24292f?logo=githubpages&logoColor=white&style=for-the-badge" height="40"></a>
   <a href="https://render.com/deploy?repo=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Render" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/render.svg" height="40"></a>
   <a href="https://railway.app/new/template?template=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy on Railway" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/railway.svg" height="40"></a>
   <a href="https://replit.com/github/debug-cli/cherri-vercel"><img alt="Run on Replit" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/replit.svg" height="40"></a>
