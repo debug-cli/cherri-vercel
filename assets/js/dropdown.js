@@ -395,7 +395,7 @@ createSelector(
   appSettings.theme,
   "graip_theme",
   "themeUpdated",
-  "Successfully updated theme! Refresh to see background change."
+  "Theme and fog colors updated."
 );
 
 createSelector(

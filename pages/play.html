@@ -203,15 +203,15 @@
         Press Alt + G to open the Game Overlay
     </div>
 
-    <div id="gameOverlay" class="">
-        <div class="graip-info">
+    <div id="gameOverlay" aria-hidden="true">
+        <div class="graip-info" id="graip-info" hidden>
             <span id="currentTime">Loading time...</span>
             <span class="divider"></span>
             <span id="temperature">Loading temp...</span>
             <span class="divider"></span>
             <span id="sessionTime">Loading session time...</span>
         </div>
-        <div class="record-widget">
+        <div class="record-widget" id="record-widget">
             <h1>Record</h1>
             <button id="startRecording" style="margin-left: 0;" onclick="startRecording()">
                 <i class="ri-record-circle-line"></i>
@@ -220,7 +220,7 @@
                 <i class="ri-stop-fill"></i>
             </button>
         </div>
-        <div class="game-controls">
+        <div class="game-controls" id="game-controls">
             <h1>Game Controls</h1>
             <button style="margin-left: 0;"
                 onclick="document.getElementById('gameframe').src = document.getElementById('gameframe').src">
@@ -232,11 +232,23 @@
             <button onclick="downloadGame()" id="downloadBtn">
                 <i class="ri-download-line"></i>
             </button>
-            <button style="margin-right: 0;" onclick="window.location.href = '/'">
+            <button style="margin-right: 0;" onclick="exitGameToGraip()" aria-label="Exit game and return to Graip">
                 <i class="ri-door-open-line"></i>
             </button>
         </div>
-        <iframe src="/pages/browser-minimum.html" frameborder="0" class="proxy-widget"></iframe>
+        <div class="overlay-widget-toolbar" role="toolbar" aria-label="Game overlay widgets">
+            <button type="button" class="overlay-widget-toggle is-on" data-widget-target="record-widget" aria-pressed="true" aria-label="Show or hide recording controls" title="Recording controls"><i class="ri-record-circle-line"></i></button>
+            <button type="button" class="overlay-widget-toggle" data-widget-target="graip-info" aria-pressed="false" aria-label="Show or hide session information" title="Session information"><i class="ri-information-line"></i></button>
+            <button type="button" class="overlay-widget-toggle is-on" data-widget-target="game-controls" aria-pressed="true" aria-label="Show or hide game controls" title="Game controls"><i class="ri-gamepad-line"></i></button>
+            <button type="button" class="overlay-widget-toggle" data-widget-target="browser-widget" aria-pressed="false" aria-label="Show or hide the mini browser" title="Mini browser"><i class="ri-global-line"></i></button>
+        </div>
+        <section class="overlay-browser-window" id="browser-widget" hidden aria-label="Mini browser">
+            <header class="overlay-browser-drag-handle">
+                <span><i class="ri-global-line" aria-hidden="true"></i> Mini browser</span>
+                <button type="button" class="overlay-browser-close" id="close-browser-widget" aria-label="Close mini browser"><i class="ri-close-line"></i></button>
+            </header>
+            <iframe frameborder="0" class="proxy-widget" title="Game mini browser"></iframe>
+        </section>
     </div>
 
     <p id="bottom-tip">If a game doesn't work, try popping it out!</p>
@@ -288,6 +300,7 @@
         const gameframe = document.getElementById('gameframe');
         const urlParams = new URLSearchParams(window.location.search);
         const gameurl = urlParams.get('launch');
+        const openedFromGamesMenu = urlParams.get('graipOverlay') === '1';
 
         if (gameurl) {
             gameframe.src = decodeURIComponent(gameurl);
@@ -306,6 +319,14 @@
                 `
 
                 head.appendChild(script)
+            }
+        }
+
+        function exitGameToGraip() {
+            if (window.top !== window) {
+                window.top.postMessage({ type: "graip-exit-game" }, window.location.origin)
+            } else {
+                window.location.replace("/?launch=1")
             }
         }
 
@@ -334,7 +355,7 @@
 
         const useOverlay = localStorage.getItem("graip_useOverlay") ?? "yes"
 
-        if (useOverlay === "yes") {
+        if (useOverlay === "yes" && gameurl && openedFromGamesMenu) {
             initOverlay()
         }
 
@@ -343,6 +364,8 @@
             const frame = document.querySelector("#gameframe")
             const overlay = document.getElementById("gameOverlay")
             const overlayNotice = document.querySelector(".overlay-notice")
+            const browserWidget = document.getElementById("browser-widget")
+            const widgetButtons = document.querySelectorAll("[data-widget-target]")
             controls.style.display = "none"
             document.querySelector("#bottom-tip").style.display = "none"
             frame.style.height = "100vh"
@@ -355,24 +378,63 @@
             setTimeout(() => {
                 overlayNotice.style.opacity = 0
             }, 3000)
-            window.addEventListener("message", (ev) => {
-                if (ev.data.type === "alt-g") {
-                    if (overlay.classList.contains("active")) {
-                        overlay.classList.remove("active")
-                    } else {
-                        overlay.classList.add("active")
-                    }
-                }
-            });
-            document.addEventListener("keydown", (e) => {
-                if (e.altKey && e.key === "g") {
-                    if (overlay.classList.contains("active")) {
-                        overlay.classList.remove("active")
-                    } else {
-                        overlay.classList.add("active")
-                    }
+            const setOverlayVisible = visible => {
+                overlay.classList.toggle("active", visible)
+                overlay.setAttribute("aria-hidden", String(!visible))
+            }
+            const toggleOverlay = () => setOverlayVisible(!overlay.classList.contains("active"))
+            window.addEventListener("message", ev => {
+                if (ev.data && ev.data.type === "alt-g") toggleOverlay()
+            })
+            document.addEventListener("keydown", e => {
+                if (e.altKey && e.key.toLowerCase() === "g") {
+                    e.preventDefault()
+                    toggleOverlay()
                 }
             })
+            widgetButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    const target = document.getElementById(button.dataset.widgetTarget)
+                    if (!target) return
+                    const visible = button.getAttribute("aria-pressed") !== "true"
+                    button.setAttribute("aria-pressed", String(visible))
+                    button.classList.toggle("is-on", visible)
+                    target.hidden = !visible
+                    if (target === browserWidget && visible) {
+                        const frame = target.querySelector("iframe")
+                        if (frame && !frame.getAttribute("src")) frame.src = "/pages/browser-minimum.html"
+                    }
+                    window.GraipLog && window.GraipLog.action("game-overlay", `widget ${button.dataset.widgetTarget} ${visible ? "shown" : "hidden"}`)
+                })
+            })
+            document.getElementById("close-browser-widget").addEventListener("click", () => {
+                const button = document.querySelector('[data-widget-target="browser-widget"]')
+                browserWidget.hidden = true
+                button.setAttribute("aria-pressed", "false")
+                button.classList.remove("is-on")
+            })
+            const dragHandle = document.querySelector(".overlay-browser-drag-handle")
+            let dragState = null
+            dragHandle.addEventListener("pointerdown", event => {
+                if (event.target.closest("button")) return
+                const rect = browserWidget.getBoundingClientRect()
+                dragState = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top }
+                dragHandle.setPointerCapture(event.pointerId)
+                browserWidget.style.right = "auto"
+                browserWidget.style.bottom = "auto"
+                browserWidget.style.left = `${rect.left}px`
+                browserWidget.style.top = `${rect.top}px`
+            })
+            dragHandle.addEventListener("pointermove", event => {
+                if (!dragState) return
+                const maxLeft = Math.max(0, innerWidth - browserWidget.offsetWidth)
+                const maxTop = Math.max(0, innerHeight - browserWidget.offsetHeight)
+                browserWidget.style.left = `${Math.min(maxLeft, Math.max(0, dragState.left + event.clientX - dragState.x))}px`
+                browserWidget.style.top = `${Math.min(maxTop, Math.max(0, dragState.top + event.clientY - dragState.y))}px`
+            })
+            const endDrag = () => { dragState = null }
+            dragHandle.addEventListener("pointerup", endDrag)
+            dragHandle.addEventListener("pointercancel", endDrag)
         }
 
         async function getTemp() {
@@ -391,7 +453,9 @@
             return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         }
 
-        setInterval(getOSTime(), 60000)
+        setInterval(() => {
+            document.getElementById("currentTime").textContent = getOSTime()
+        }, 60000)
 
         document.getElementById("currentTime").textContent = getOSTime()
 

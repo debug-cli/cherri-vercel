@@ -140,3 +140,72 @@
         display: none;
     }
 }
+
+
+/* Keep the first AI response below the shell's floating top navigation and
+   keep the composer inside the phone width. */
+@media (max-width: 640px) {
+    html body.assistant-page .messages-container {
+        top: 68px;
+        bottom: 82px;
+        width: calc(100% - 16px);
+        height: auto;
+        box-sizing: border-box;
+        padding: 8px;
+        align-items: stretch;
+    }
+
+    html body.assistant-page .my-message {
+        align-self: flex-end;
+        max-width: 86%;
+        box-sizing: border-box;
+    }
+
+    html body.assistant-page .ai-message {
+        align-self: flex-start;
+        max-width: 94%;
+        box-sizing: border-box;
+    }
+
+    html body.assistant-page > .container {
+        position: fixed !important;
+        left: 8px !important;
+        right: 8px !important;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        transform: none !important;
+        z-index: 4;
+        display: flex;
+        width: auto;
+        align-items: center;
+        gap: 6px;
+    }
+
+    html body.assistant-page > .container input {
+        flex: 1 1 auto;
+        width: auto !important;
+        min-width: 0;
+        margin: 0;
+    }
+
+    html body.assistant-page > .container button {
+        flex: 0 0 42px;
+        width: 42px;
+        height: 42px;
+        margin: 0;
+        padding: 0;
+        font-size: 18px;
+    }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+    html body.assistant-page .messages-container {
+        top: 58px;
+        bottom: 68px;
+        height: auto;
+        width: min(94vw, 760px);
+    }
+
+    html body.assistant-page > .container {
+        bottom: 8px !important;
+    }
+}

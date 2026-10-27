@@ -119,11 +119,6 @@
                     <i class="ri-robot-2-line"></i>
                 </a>
             </li>
-            <li>
-                <a onclick="navTo('chatrooms');" href="#" data-page="chatrooms">
-                    <i class="ri-chat-1-line"></i>
-                </a>
-            </li>
             <li class="divider"></li>
             <li>
                 <a onclick="togglePartners()" href="#" data-page="movies">
@@ -746,8 +741,8 @@
     </div>
 
     <div class="games-wrapper settings-hidden">
-        <input onkeyup="searchApps(this.value)" type="text" style="font-family: Arial;"
-            placeholder="search through the games..." id="apps-search"
+        <input oninput="searchApps(this.value)" type="search" style="font-family: Arial;"
+            placeholder="Search through games..." id="games-search" aria-label="Search through games"
             class="h-fit p-4 px-5 w-[975px] bg-[var(--bg-2)] border-none absolute left-1/2 translate-x-[-50%] rounded-2xl transition-all focus:bg-[var(--bg-3)] focus:outline-none ">
         <br><br><br>
         <div
@@ -755,6 +750,18 @@
             <br>
         </div>
         <br>
+    </div>
+
+    <div class="mobile-game-dialog" id="mobile-game-dialog" aria-hidden="true">
+        <div class="mobile-game-dialog-backdrop" data-close-game-dialog></div>
+        <section class="mobile-game-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="mobile-game-title">
+            <button class="mobile-game-dialog-close" type="button" aria-label="Close game details" data-close-game-dialog>
+                <i class="ri-close-line" aria-hidden="true"></i>
+            </button>
+            <img id="mobile-game-image" alt="" />
+            <h2 id="mobile-game-title"></h2>
+            <button class="mobile-game-play" type="button" id="mobile-game-play">Play</button>
+        </section>
     </div>
 
     <div class="partners-wrapper settings-hidden">
@@ -832,16 +839,39 @@
                     }
 
                     const newAppContainer = document.createElement("div")
-
                     newAppContainer.classList.add("app")
-                    newAppContainer.setAttribute("onclick", `toggle${functionName}();${toRun}('${additions}${item.url}')`)
                     newAppContainer.innerHTML = `
                         <div class="bg-img" data-bg="${item.img || ""}"></div>
                         <div class="app-title-cont">
-                            <h2 class="app-title-h2">${item.name}</h2>
+                            <h2 class="app-title-h2"></h2>
                         </div>
                     `
+                    const title = newAppContainer.querySelector(".app-title-h2")
+                    if (title) title.textContent = item.name
 
+                    if (type === "games") {
+                        newAppContainer.classList.add("game-launch-card")
+                        newAppContainer.setAttribute("role", "button")
+                        newAppContainer.setAttribute("tabindex", "0")
+                        newAppContainer.setAttribute("aria-label", `${item.name} details`)
+                        const openGame = () => {
+                            if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+                                openMobileGame(item)
+                            } else {
+                                toggleGames()
+                                navTo(`play.html?launch=${encodeURIComponent(item.url)}&graipOverlay=1`)
+                            }
+                        }
+                        newAppContainer.addEventListener("click", openGame)
+                        newAppContainer.addEventListener("keydown", event => {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault()
+                                openGame()
+                            }
+                        })
+                    } else {
+                        newAppContainer.setAttribute("onclick", `toggle${functionName}();${toRun}('${additions}${item.url}')`)
+                    }
                     aCont.appendChild(newAppContainer)
                 })
 
@@ -932,6 +962,49 @@
             load(newStore, "games", "Games", "navTo", "play.html?launch=")
         })
 
+        let selectedMobileGame = null
+        const mobileGameDialog = document.getElementById("mobile-game-dialog")
+        const mobileGameImage = document.getElementById("mobile-game-image")
+        const mobileGameTitle = document.getElementById("mobile-game-title")
+        const mobileGamePlay = document.getElementById("mobile-game-play")
+
+        function openMobileGame(game) {
+            if (!mobileGameDialog || !game) return
+            selectedMobileGame = game
+            mobileGameImage.src = game.img || "/assets/img/fav.png"
+            mobileGameImage.alt = `${game.name} icon`
+            mobileGameTitle.textContent = game.name
+            mobileGameDialog.classList.add("is-open")
+            mobileGameDialog.setAttribute("aria-hidden", "false")
+            mobileGamePlay.focus()
+            window.GraipLog && window.GraipLog.action("games", "show mobile game details", { name: game.name })
+        }
+
+        function closeMobileGame() {
+            if (!mobileGameDialog) return
+            mobileGameDialog.classList.remove("is-open")
+            mobileGameDialog.setAttribute("aria-hidden", "true")
+            selectedMobileGame = null
+        }
+
+        function launchMobileGame() {
+            if (!selectedMobileGame) return
+            const game = selectedMobileGame
+            closeMobileGame()
+            toggleGames()
+            navTo(`play.html?launch=${encodeURIComponent(game.url)}&graipOverlay=1`)
+        }
+
+        mobileGameDialog && mobileGameDialog.querySelectorAll("[data-close-game-dialog]").forEach(button => {
+            button.addEventListener("click", closeMobileGame)
+        })
+        mobileGamePlay && mobileGamePlay.addEventListener("click", launchMobileGame)
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && mobileGameDialog && mobileGameDialog.classList.contains("is-open")) {
+                closeMobileGame()
+            }
+        })
+
         function searchApps(term) {
             const apps = document.querySelectorAll(".app")
             apps.forEach((app) => {
@@ -996,8 +1069,14 @@
         const homeContent = document.getElementById('homeContent');
         const navLinks = document.querySelectorAll('nav a[data-page]');
 
+        window.addEventListener("message", event => {
+            if (event.origin !== window.location.origin || !contentFrame.contentWindow || event.source !== contentFrame.contentWindow) return
+            if (event.data && event.data.type === "graip-exit-game") navTo("home?launch=1")
+        })
+
         function navTo(l) {
-            window.GraipLog && window.GraipLog.action("nav", `open ${l}`)
+            const safeTarget = String(l).split(/[?#]/, 1)[0]
+            window.GraipLog && window.GraipLog.action("nav", `open ${safeTarget}`)
             if (l.includes("home")) {
                 contentFrame.remove();
                 document.querySelector("nav").style.display = "block"
@@ -1518,20 +1597,7 @@
                 newpjs.setAttribute("id", "vanta-fog-container")
                 document.body.append(newpjs)
                 localStorage.setItem("graip_particlesOn", "yes")
-                window.graipFogEffect = VANTA.FOG({
-                    el: "#vanta-fog-container",
-                    mouseControls: true,
-                    touchControls: true,
-                    gyroControls: false,
-                    minHeight: 200.00,
-                    minWidth: 200.00,
-                    highlightColor: hexToNumber(cssVar("--accent")),
-                    midtoneColor: hexToNumber(cssVar("--bg-2")),
-                    lowlightColor: hexToNumber(cssVar("--bg-5")),
-                    baseColor: hexToNumber(cssVar("--bg")),
-                    blurFactor: 0.90,
-                    speed: 1
-                })
+window.graipStartFog && window.graipStartFog()
                 showToast("success", "Vanta is now on!", "fas fa-check-circle")
             } else {
                 const newpcont = document.getElementById("vanta-fog-container")
@@ -1747,19 +1813,17 @@
         const styles = getComputedStyle(document.documentElement)
 
         function cssVar(name) {
-            return styles.getPropertyValue(name).trim()
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
         }
 
         function hexToNumber(hex) {
             return parseInt(hex.replace("#", ""), 16)
         }
 
-        const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
-        if (useFog === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
-            // WebGL is missing on some school devices and in embedded webviews;
-            // an uncaught throw here used to abort the rest of this script block
-            // (visitor counter, Wisp status, the settings forms below).
+        window.graipStartFog = function () {
+            if (localStorage.getItem("graip_particlesOn") !== "yes" || localStorage.getItem("graip_reduceMotion") === "yes") return
             try {
+                if (window.graipFogEffect && typeof window.graipFogEffect.destroy === "function") window.graipFogEffect.destroy()
                 window.graipFogEffect = VANTA.FOG({
                     el: "#vanta-fog-container",
                     mouseControls: true,
@@ -1775,12 +1839,29 @@
                     speed: 1
                 })
             } catch (error) {
-                // cosmetic effect only: say so in the log, keep the page working
                 window.GraipLog && window.GraipLog.warn("ui", "fog background unavailable", {
                     error: (error && error.message) || String(error),
                 })
             }
         }
+
+        window.graipRefreshFog = function () {
+            if (localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
+                window.graipStartFog()
+            }
+        }
+
+        const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
+        if (useFog === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") window.graipStartFog()
+
+        document.addEventListener("themeUpdated", () => {
+            const link = document.getElementById("css-theme-link")
+            const refresh = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+                window.graipRefreshFog && window.graipRefreshFog()
+            }))
+            if (link) link.addEventListener("load", refresh, { once: true })
+            else refresh()
+        })
 
         /**
          * Visitor counter.

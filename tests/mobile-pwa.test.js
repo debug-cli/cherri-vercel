@@ -312,7 +312,7 @@ test("phone navigation fits a compact grid and toasts sit above the bottom bar",
   const css = read("styles/index.css");
   const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
   const toastCss = read("assets/css/t.css");
-  assert.match(phoneRules, /grid-template-columns:\s*repeat\(10,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(phoneRules, /grid-template-columns:\s*repeat\(9,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(phoneRules, /height:\s*48px/);
   assert.match(toastCss, /@media \(max-width: 640px\)[\s\S]*?\.toast-container\s*\{[\s\S]*?top:\s*auto !important;[\s\S]*?bottom:\s*calc\(48px/);
 });
@@ -325,4 +325,64 @@ test("mobile home search icon sits inline with the placeholder and nav logo is c
   assert.match(phoneRules, /#homesearch\s*\{[^}]*flex:\s*1 1 auto/);
   assert.match(phoneRules, /nav ul li:first-child a\s*\{[^}]*margin:\s*0 !important/);
   assert.match(phoneRules, /nav ul li:first-child img\s*\{[^}]*margin:\s*0 !important/);
+});
+
+test("phone game drawer has search, a four-column icon grid, and a separate play dialog", () => {
+  const html = read("index.html");
+  const css = read("styles/index.css");
+  assert.match(html, /id="games-search"/);
+  assert.match(html, /id="mobile-game-dialog"[\s\S]*?id="mobile-game-image"[\s\S]*?id="mobile-game-title"[\s\S]*?id="mobile-game-play"/);
+  assert.match(html, /openMobileGame\(item\)/);
+  assert.match(html, /graipOverlay=1/);
+  assert.match(css, /\.games-wrapper > #games-search\s*\{[\s\S]*?width:\s*100% !important/);
+  assert.match(css, /\.games-wrapper > \.games-container\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+  assert.match(css, /\.games-container \.game-launch-card::after/);
+});
+
+test("game overlay widgets are opt-in, lazy-load the mini browser, and exit to Graip", () => {
+  const play = read("pages/play.html");
+  const shell = read("index.html");
+  const overlayCss = read("assets/css/overlay.css");
+  assert.match(play, /const openedFromGamesMenu = urlParams\.get\('graipOverlay'\) === '1'/);
+  assert.match(play, /useOverlay === "yes" && gameurl && openedFromGamesMenu/);
+  assert.match(play, /id="browser-widget" hidden/);
+  assert.doesNotMatch(play.match(/<section class="overlay-browser-window"[\s\S]*?<\/section>/)[0], /<iframe[^>]+src=/);
+  assert.match(play, /if \(frame && !frame\.getAttribute\("src"\)\)/);
+  assert.match(play, /exitGameToGraip\(\)/);
+  assert.match(shell, /event\.data\.type === "graip-exit-game"\) navTo\("home\?launch=1"\)/);
+  assert.match(overlayCss, /#gameOverlay\.active \.overlay-widget-toolbar/);
+  assert.match(overlayCss, /\.overlay-widget-toggle\.is-on/);
+});
+
+test("theme changes rebuild enabled Vanta fog from the active palette", () => {
+  const html = read("index.html");
+  const dropdown = read("assets/js/dropdown.js");
+  assert.match(html, /window\.graipRefreshFog = function/);
+  assert.match(html, /document\.addEventListener\("themeUpdated"/);
+  assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
+  assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
+  assert.match(dropdown, /theme: localStorage\.getItem\("graip_theme"\) \|\| "midnight"/);
+  assert.match(dropdown, /Theme and fog colors updated/);
+});
+
+test("chatroom button is removed and AI chat reserves space below the shell toolbar", () => {
+  const shell = read("index.html");
+  const assistant = read("pages/assistant.html");
+  const mobile = read("assets/css/mobile.css");
+  const shellCss = read("styles/index.css");
+  assert.doesNotMatch(shell, /data-page="chatrooms"/);
+  assert.match(shellCss, /repeat\(9, minmax\(0, 1fr\)\)/);
+  assert.match(assistant, /<body class="assistant-page">/);
+  assert.match(mobile, /assistant-page \.messages-container\s*\{\s*top:\s*68px/);
+  assert.match(mobile, /assistant-page > \.container\s*\{\s*position:\s*fixed/);
+});
+
+test("settings version fade remains confined to the category rail", () => {
+  const css = read("styles/index.css");
+  const docs = read("AGENTS.md");
+  assert.match(css, /\.settings-sidebar::after\s*\{[\s\S]*?backdrop-filter:\s*blur\(7px\)[\s\S]*?mask-image:\s*linear-gradient/);
+  assert.match(css, /\.settings-sidebar::after \{ display: none; \}/);
+  assert.match(docs, /### 11\.2 Reading a settings JSON file/);
+  assert.match(docs, /\| `graip_wispUrlCustom` \| User-supplied WebSocket endpoint/);
+  assert.match(docs, /\| `graip_panicOpenIn` \| Whether panic opens in the same tab or a new tab/);
 });

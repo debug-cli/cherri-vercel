@@ -34,7 +34,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (125 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (132 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -138,7 +138,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  125 dependency-free tests
+└── tests/                     13 files  132 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -173,7 +173,7 @@ external). It is the app.
 | Line | Element | Role |
 | --- | --- | --- |
 | 73 | `#gohomeblock` | Floating "back to home" button shown while a page is open |
-| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, chat, partners, settings, Discord. The `gmbl` (gambling) entry is commented out |
+| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, partners, settings, Discord. Chatrooms remains a direct page but has no sidebar button. The `gmbl` entry is commented out |
 | 156 | `#homeContent` | Hero: logo, splash text, search box, visitor count |
 | 179 | `#contentFrame` | The iframe every page loads into (`navTo`) |
 | 181 | `.settings-container.settings-hidden` | The settings sheet (fixed 625 px) |
@@ -510,7 +510,7 @@ There is also a one-time migration: `graip_searchEngineGoogleDefaultV1` rewrites
 
 Backend-free settings backup. Full format spec in §11. Structural notes:
 
-- `SCHEMA` (24 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
+- `SCHEMA` (23 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
   `graip_tabs*` is skipped by prefix.
 - `sanitize(entry, raw)` is the only writer path and returns `{ ok, value }` / `{ ok: false, reason }`.
 - `apply(input)` merges: absent keys untouched, `null`/`""` on optional keys ignored, unchanged values
@@ -626,7 +626,7 @@ Custom events on `document` (from `dropdown.js`) and `window` (from `wisp.js`):
 
 | Event | Target | `detail` | Producer | Consumer |
 | --- | --- | --- | --- | --- |
-| `themeUpdated` | `document` | theme name | `dropdown.js` | `dropdown.js` (swaps `#css-theme-link`) |
+| `themeUpdated` | `document` | theme name | `dropdown.js` | `dropdown.js` (swaps `#css-theme-link`), `index.html` (rebuilds enabled Fog with the new theme colors) |
 | `decoyUpdated` | `document` | profile name | `dropdown.js` | `dropdown.js` → `GraipCloak.applyCloak` |
 | `storeUpdated` | `document` | `Classplay`/`GN-Math` | `dropdown.js` | `index.html` (reloads the games grid) |
 | `wispUpdated` | `document` | endpoint | `dropdown.js` | `dropdown.js` (`selectWisp`) |
@@ -799,7 +799,7 @@ timeout, `libcurl_abort` path).
 Accepted inputs on import: this object, the same object without the wrapper (a bare map), or either as
 a JSON string. `MAX_BYTES` = 64 KiB.
 
-### 11.1 Schema (22 keys)
+### 11.1 Schema (23 keys)
 
 | Group | Keys | Type |
 | --- | --- | --- |
@@ -809,7 +809,46 @@ a JSON string. `MAX_BYTES` = 64 KiB.
 | gaming | `graip_gameStore`, `graip_useOverlay`, `graip_confirmLeave` | token, bool, bool |
 | logging | `graip_verboseLogs` | bool (`on`/`off`) |
 
-### 11.2 Validation rules (the security boundary)
+### 11.2 Reading a settings JSON file
+
+Treat the file as a versioned backup envelope. The top-level `format` identifies it as a Graip settings
+backup; `version` is the envelope/schema generation (currently `1`); `exportedAt` is when the file
+was created; `site` records the Graip origin that made it. The `settings` object is the actual map of
+setting key to saved value. Keys deliberately match Graip's preference keys, so use the table below
+as a legend. Values are strings in the format expected by storage, not labels to display verbatim.
+The file does not include browsing history, open tabs, debug logs, or runtime Wisp health data.
+
+| JSON key | Meaning of its value |
+| --- | --- |
+| `graip_theme` | Theme name; `midnight` is the default. |
+| `graip_reduceMotion` | `yes` disables animations, Fog and the custom cursor; `no` permits their separate controls. |
+| `graip_particlesOn` | Whether the animated Vanta Fog background is enabled (`yes`/`no`). |
+| `graip_customCursor` | Whether the custom circle cursor is enabled (`yes`/`no`). |
+| `graip_wispUrlSelected` | Identifier of the selected Wisp route, or `Custom`/`Local`. |
+| `graip_wispUrlCustom` | User-supplied WebSocket endpoint (`wss://…`) used for a custom route. |
+| `graip_backend` | Proxy engine selection: `scramjet` or `ultraviolet`. |
+| `graip_searchEngine` | Search provider used for address-bar searches. |
+| `decoy` | Cloak profile name used for the tab title/icon disguise. |
+| `graip_cloakTitle` | Optional custom tab title for a cloak. |
+| `graip_cloakIcon` | Optional icon URL/path for a cloak. |
+| `graip_cloakProfile` | Selected built-in cloak profile. |
+| `graip_panicEnabled` | Whether the panic key is enabled. |
+| `graip_panicKey` | Configured keyboard key for panic activation. The key value is not a keystroke history. |
+| `graip_panicTarget` | Preset destination chosen for panic activation. |
+| `graip_panicTargetUrl` | Custom panic destination URL, when selected. |
+| `graip_panicOpenIn` | Whether panic opens in the same tab or a new tab. |
+| `graip_panicShowDecoy` | Whether to show the decoy page during panic. |
+| `graip_autoAB` | Whether automatic `about:blank` cloaking is enabled. |
+| `graip_gameStore` | Game catalog selection (`Classplay` or `GN-Math`). |
+| `graip_useOverlay` | Whether the optional game overlay is enabled. |
+| `graip_confirmLeave` | Whether Graip asks before leaving the page. |
+| `graip_verboseLogs` | Whether routine debug/action logs are recorded (`on`/`off`). |
+
+A bare map containing those keys is also accepted for import. Unknown keys and invalid values are
+reported and skipped; missing keys are left unchanged. Never assume the input is trusted: `sanitize()`
+validates each entry before storage is written.
+
+### 11.3 Validation rules (the security boundary)
 
 | Type | Accepts | Rejects |
 | --- | --- | --- |
@@ -825,7 +864,7 @@ a JSON string. `MAX_BYTES` = 64 KiB.
 Control characters are rejected for every type. `null`/`""` on an optional key means "leave it alone",
 not "clear it".
 
-### 11.3 Merge and side effects
+### 11.4 Merge and side effects
 
 - Absent key → untouched. Invalid → skipped and reported. Same value → counted as unchanged, not
   rewritten.
@@ -998,7 +1037,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 125 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 132 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1014,7 +1053,7 @@ node --test tests/*.test.js        # 125 tests, ~5 s, no dependencies, no networ
 | `page-bootstrap.test.js` | 11 | Every page boots with missing DOM/globals |
 | `site-wiring.test.js` | 10 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure, no duplicate `<script src>`, release version |
 | `panic-log.test.js` | 32 | Log filtering/redaction, panic matching/navigation, decoy structure, the return path (`returnUrl`/`leave` run against a fake document), `GraipShellState` capture/restore/resume, cloak profiles, tab restore, omnibox |
-| `mobile-pwa.test.js` | 10 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
+| `mobile-pwa.test.js` | 15 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
 | `settings-io.test.js` | 28 | Allowlist, validation, partial imports, reset, failure paths, panel wiring |
 
 Conventions that make these work — follow them, they cost nothing:
@@ -1273,7 +1312,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 125/125, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 132/132, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1308,7 +1347,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (125 tests) and this handbook.
+- Added `tests/` (132 tests) and this handbook.
 
 ---
 
@@ -1321,7 +1360,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 125 pass
+node --test tests/*.test.js | tail -3                              # 132 pass
 git ls-files | wc -l                                               # 8400
 ```
 
