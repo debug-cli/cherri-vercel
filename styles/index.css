@@ -2315,3 +2315,73 @@ span.online-count {
     .apps-wrapper > .apps-container,
     .games-wrapper > .games-container { gap: 8px; }
 }
+
+/* Force the mobile drawer's panel and search row to use the full centered width.
+   Explicit flex alignment prevents desktop utility classes from constraining the
+   inner grid to half-width on narrow Chromium emulation viewports. */
+@media (max-width: 900px) {
+    .apps-wrapper,
+    .games-wrapper {
+        left: 50% !important;
+        right: auto !important;
+        align-items: stretch !important;
+        justify-content: flex-start;
+    }
+
+    .apps-wrapper.settings-hidden,
+    .games-wrapper.settings-hidden {
+        transform: translate(-50%, -50%) scale(.9) !important;
+    }
+
+    .apps-wrapper.settings-shown,
+    .games-wrapper.settings-shown {
+        transform: translate(-50%, -50%) scale(1) !important;
+    }
+
+    .apps-wrapper > #apps-search,
+    .games-wrapper > #games-search {
+        align-self: stretch !important;
+        flex-basis: auto;
+        max-width: 100% !important;
+    }
+
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container {
+        align-self: stretch !important;
+        justify-self: stretch !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        margin-inline: 0 !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        column-gap: 12px;
+        row-gap: 12px;
+    }
+}
+
+@media (max-width: 640px) {
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container { column-gap: 10px; row-gap: 10px; }
+
+    /* Fit the Special Thanks panel to its content rather than leaving a blank
+       lower half on phones; the list still scrolls if it grows beyond the cap. */
+    .partners-wrapper {
+        box-sizing: border-box;
+        height: auto;
+        min-height: 0;
+        max-height: 70vh;
+        padding: 12px;
+    }
+
+    .special-thanks-grid {
+        box-sizing: border-box;
+        height: auto;
+        max-height: calc(70vh - 70px);
+        align-content: start;
+        overflow-y: auto;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 640px) {
+    .partners-wrapper { height: auto; max-height: 88vh; }
+    .special-thanks-grid { height: auto; max-height: calc(88vh - 62px); }
+}

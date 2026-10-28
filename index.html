@@ -114,7 +114,7 @@
                 </a>
             </li>
             <li>
-                <a onclick="navTo('assistant'); showToast('success', 'AI is in beta! Report bugs on the Discord/Repo', 'fas fa-exclamation-triangle')"
+                <a onclick="navTo('assistant')"
                     href="#" data-page="ai">
                     <i class="ri-robot-2-line"></i>
                 </a>
@@ -1818,7 +1818,14 @@ window.graipStartFog && window.graipStartFog()
         window.graipStartFog = function () {
             if (localStorage.getItem("graip_particlesOn") !== "yes" || localStorage.getItem("graip_reduceMotion") === "yes") return
             try {
+                let fogContainer = document.getElementById("vanta-fog-container")
+                if (!fogContainer) {
+                    fogContainer = document.createElement("div")
+                    fogContainer.id = "vanta-fog-container"
+                    document.body.prepend(fogContainer)
+                }
                 if (window.graipFogEffect && typeof window.graipFogEffect.destroy === "function") window.graipFogEffect.destroy()
+                window.graipFogEffect = null
                 window.graipFogEffect = VANTA.FOG({
                     el: "#vanta-fog-container",
                     mouseControls: true,
@@ -1847,7 +1854,15 @@ window.graipStartFog && window.graipStartFog()
         }
 
         const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
-        if (useFog === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") window.graipStartFog()
+        if (useFog === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
+            window.graipStartFog()
+            // Re-attempt after layout settles if WebGL initialization raced first paint.
+            window.addEventListener("load", () => {
+                if (!window.graipFogEffect && localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
+                    requestAnimationFrame(() => requestAnimationFrame(() => window.graipStartFog()))
+                }
+            }, { once: true })
+        }
 
         document.addEventListener("themeUpdated", () => {
             const link = document.getElementById("css-theme-link")

@@ -361,6 +361,7 @@ test("theme changes rebuild enabled Vanta fog from the active palette", () => {
   assert.match(html, /document\.addEventListener\("themeUpdated"/);
   assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
   assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
+  assert.match(html, /window\.addEventListener\("load"[\s\S]*?window\.graipStartFog\(\)/);
   assert.match(dropdown, /theme: localStorage\.getItem\("graip_theme"\) \|\| "midnight"/);
   assert.match(dropdown, /Theme and fog colors updated/);
 });
@@ -371,6 +372,7 @@ test("chatroom button is removed and AI chat reserves space below the shell tool
   const mobile = read("assets/css/mobile.css");
   const shellCss = read("styles/index.css");
   assert.doesNotMatch(shell, /data-page="chatrooms"/);
+  assert.doesNotMatch(shell, /AI is in beta/);
   assert.match(shellCss, /repeat\(8, minmax\(0, 1fr\)\)/);
   assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
   assert.match(assistant, /<body class="assistant-page">/);
@@ -385,6 +387,8 @@ test("settings version fade remains confined to the category rail", () => {
   const docs = read("AGENTS.md");
   assert.match(css, /\.settings-sidebar::after\s*\{[\s\S]*?backdrop-filter:\s*blur\(7px\)[\s\S]*?mask-image:\s*linear-gradient/);
   assert.match(css, /\.settings-sidebar::after \{ display: none; \}/);
+  assert.match(css, /\.partners-wrapper\s*\{[\s\S]*?height:\s*auto;[\s\S]*?max-height:\s*70vh/);
+  assert.match(css, /\.special-thanks-grid\s*\{[\s\S]*?height:\s*auto;[\s\S]*?overflow-y:\s*auto/);
   assert.match(docs, /### 11\.2 Reading a settings JSON file/);
   assert.match(docs, /\| `graip_wispUrlCustom` \| User-supplied WebSocket endpoint/);
   assert.match(docs, /\| `graip_panicOpenIn` \| Whether panic opens in the same tab or a new tab/);
@@ -397,11 +401,13 @@ test("mobile apps share the compact squircle launcher grid and Discord is remove
   assert.match(css, /\.apps-wrapper > \.apps-container,[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.apps-container > \.app,[\s\S]*?aspect-ratio:\s*1/);
   assert.match(css, /\.apps-container > \.app::after/);
+  assert.match(css, /min-width:\s*100% !important[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\) !important/);
 });
 
 test("movies page has independent responsive layout and bounded visible loading state", () => {
   const movies = read("pages/movies.html");
   assert.doesNotMatch(movies, /cdn\.tailwindcss|alpinejs/);
+  assert.match(movies, /assets\/js\/colors\.js/);
   assert.match(movies, /class="movie-status"[\s\S]*?Loading movies/);
   assert.match(movies, /AbortController\(\)/);
   assert.match(movies, /movie-search/);

@@ -432,9 +432,27 @@ Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md)
 
 ### v2.0.0 "juice"
 
-- Panic return restores the same page, browser tabs, drawer and settings panel.
-- Added the exportable debug log (verbose logging is on by default).
-- Released the midnight-themed graip fork with refreshed settings and release notes.
+A major reliability and usability release, delivered across [PR #1](https://github.com/debug-cli/graip/pull/1),
+[PR #2](https://github.com/debug-cli/graip/pull/2) and [PR #3](https://github.com/debug-cli/graip/pull/3).
+
+- **More reliable proxying:** probe and fail over between Wisp routes, bound retries so dead routes fail
+  promptly, and show useful proxy error pages. TLS certificate checks remain enabled; certificate
+  errors are explained rather than hidden by weakening verification.
+- **Panic key and cloaking:** configure a panic key, destination and decoy appearance; nine cloak
+  profiles can change the tab title, icon and apparent page. Escape or the configured key returns to
+  the exact page, browser tabs, open drawer and Settings panel you left.
+- **Settings backup:** export preferences to a JSON file and restore them with per-setting validation;
+  unknown or unsafe values are skipped without blocking valid settings.
+- **Debugging and privacy:** an exportable, bounded debug log records useful actions and warnings while
+  redacting query strings and sensitive destinations. The Debug panel can export JSON or plain text.
+- **Browser and sessions:** tab history survives reloads, and the address bar accepts URLs, searches
+  and shortcuts. Wisp failures are surfaced instead of leaving a tab silently stuck.
+- **Mobile and accessibility:** add an installable PWA shell, responsive small-screen layouts,
+  scrollable Settings categories, reduced-motion controls, and clearer recovery from dead integrations.
+- **Stability and maintenance:** repair broken page links and settings wiring, handle missing browser
+  APIs without aborting the rest of the page, add library thumbnail fallbacks and health checks, and
+  document the project for both users and contributors. The release keeps the midnight theme and
+  the existing v2.0.0 “juice” version stamp.
 
 ## Credits
 

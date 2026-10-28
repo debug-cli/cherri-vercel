@@ -247,7 +247,7 @@ test("the release version is 2.0.0 \"juice\" everywhere it is written", () => {
   assert.deepEqual(stale, [], `still advertising the old version: ${stale.join(", ")}`);
 
   // the shell cache name carries the release so a new build retires the old one
-  assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v3";/);
+  assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v4";/);
 });
 
 test("special thanks lists the README credits and settings categories can scroll", () => {
