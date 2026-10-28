@@ -331,13 +331,14 @@ test("phone game drawer has search, a four-column icon grid, and a separate play
   const html = read("index.html");
   const css = read("styles/index.css");
   assert.match(html, /id="games-search"/);
-  assert.match(html, /class="games-container"/);
+  assert.match(html, /class="games-container launcher-grid"/);
   assert.doesNotMatch(html, /class="games-container[^\"]*(?:w-\[|flex-wrap|absolute|left-1\/2)/);
   assert.match(html, /id="mobile-game-dialog"[\s\S]*?id="mobile-game-image"[\s\S]*?id="mobile-game-title"[\s\S]*?id="mobile-game-play"/);
   assert.match(html, /openMobileGame\(item\)/);
   assert.match(html, /graipOverlay=1/);
   assert.match(css, /\.games-wrapper > \.launcher-search\s*\{[\s\S]*?width:\s*100% !important/);
-  assert.match(css, /\.games-wrapper > \.games-container\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
+  assert.match(css, /\.games-wrapper > \.launcher-grid\s*\{[\s\S]*?display:\s*flex !important[\s\S]*?gap:\s*12px/);
+  assert.match(css, /\.launcher-grid > \.app\s*\{[\s\S]*?flex:\s*0 0 calc\(\(100% - 36px\) \/ 4\) !important[\s\S]*?aspect-ratio:\s*1/);
   assert.match(css, /\.games-container \.game-launch-card::after/);
 });
 
@@ -363,7 +364,7 @@ test("theme changes rebuild enabled Vanta fog from the active palette", () => {
   assert.match(html, /document\.addEventListener\("themeUpdated"/);
   assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
   assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
-  assert.match(html, /window\.addEventListener\("load"[\s\S]*?window\.graipStartFog\(\)/);
+  assert.match(html, /const startFogAfterLayout = \(\) =>[\s\S]*?window\.graipStartFog\(\)[\s\S]*?document\.readyState === "complete"/);
   assert.match(dropdown, /theme: localStorage\.getItem\("graip_theme"\) \|\| "midnight"/);
   assert.match(dropdown, /Theme and fog colors updated/);
 });
@@ -403,7 +404,8 @@ test("mobile apps share the compact squircle launcher grid and Discord is remove
   assert.match(css, /\.apps-wrapper > \.apps-container,[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.apps-container > \.app,[\s\S]*?aspect-ratio:\s*1/);
   assert.match(css, /\.apps-container > \.app::after/);
-  assert.match(css, /min-width:\s*100% !important[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\) !important/);
+  assert.match(shell, /class="apps-container launcher-grid"/);
+  assert.match(css, /\.apps-wrapper > \.launcher-grid,[\s\S]*?\.games-wrapper > \.launcher-grid\s*\{[\s\S]*?display:\s*flex !important[\s\S]*?gap:\s*12px/);
 });
 
 test("movies page has independent responsive layout and bounded visible loading state", () => {

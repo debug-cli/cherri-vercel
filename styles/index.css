@@ -2351,9 +2351,9 @@ span.online-count {
     .games-wrapper > .games-container { gap: 8px; }
 }
 
-/* Force the mobile drawer's panel and search row to use the full centered width.
-   Explicit flex alignment prevents desktop utility classes from constraining the
-   inner grid to half-width on narrow Chromium emulation viewports. */
+/* Shared launcher layout: use the same flex-wrapped tile row for Apps and Games.
+   Explicit sizing prevents game cards' intrinsic image dimensions from collapsing
+   row spacing or pushing the flex items out of the centered panel. */
 @media (max-width: 900px) {
     .apps-wrapper,
     .games-wrapper {
@@ -2381,16 +2381,28 @@ span.online-count {
         max-width: 100% !important;
     }
 
-    .apps-wrapper > .apps-container,
-    .games-wrapper > .games-container {
+    .apps-wrapper > .launcher-grid,
+    .games-wrapper > .launcher-grid {
+        display: flex !important;
+        flex-flow: row wrap;
         align-self: stretch !important;
-        justify-self: stretch !important;
+        align-content: flex-start;
+        justify-content: flex-start;
         min-width: 100% !important;
         max-width: 100% !important;
         margin-inline: 0 !important;
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-        column-gap: 12px;
-        row-gap: 12px;
+        gap: 12px;
+    }
+
+    .launcher-grid > .app {
+        box-sizing: border-box;
+        flex: 0 0 calc((100% - 36px) / 4) !important;
+        width: calc((100% - 36px) / 4) !important;
+        height: auto !important;
+        min-width: 0;
+        min-height: 0;
+        aspect-ratio: 1;
+        margin: 0 !important;
     }
 }
 

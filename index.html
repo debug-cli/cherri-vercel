@@ -710,7 +710,7 @@
         <input oninput="searchApps(this.value)" type="search" style="font-family: Arial;"
             placeholder="Search through apps..." id="apps-search" aria-label="Search through apps"
             class="launcher-search">
-        <div class="apps-container" aria-label="Apps"></div>
+        <div class="apps-container launcher-grid" aria-label="Apps"></div>
     </div>
 
     <div class="download-wrapper settings-hidden">
@@ -734,7 +734,7 @@
         <input oninput="searchApps(this.value)" type="search" style="font-family: Arial;"
             placeholder="Search through games..." id="games-search" aria-label="Search through games"
             class="launcher-search">
-        <div class="games-container" aria-label="Games"></div>
+        <div class="games-container launcher-grid" aria-label="Games"></div>
     </div>
 
     <div class="mobile-game-dialog" id="mobile-game-dialog" aria-hidden="true">
@@ -1843,17 +1843,13 @@ window.graipStartFog && window.graipStartFog()
             }
         }
 
-        const useFog = localStorage.getItem("graip_particlesOn") ?? "yes"
-        if (useFog === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
-            window.graipStartFog()
-            // Rebuild after the page has completed layout; Vanta can bind before
-            // the first mobile viewport dimensions are stable in device emulation.
-            window.addEventListener("load", () => {
-                if (localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
-                    requestAnimationFrame(() => requestAnimationFrame(() => window.graipStartFog()))
-                }
-            }, { once: true })
+        const startFogAfterLayout = () => {
+            if (localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
+                requestAnimationFrame(() => requestAnimationFrame(() => window.graipStartFog()))
+            }
         }
+        if (document.readyState === "complete") startFogAfterLayout()
+        else window.addEventListener("load", startFogAfterLayout, { once: true })
 
         document.addEventListener("themeUpdated", () => {
             const link = document.getElementById("css-theme-link")
