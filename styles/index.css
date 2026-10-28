@@ -706,7 +706,42 @@ p a:hover {
 
 .apps-container,
 .games-container {
-    width: 975px;
+    position: absolute;
+    top: 75px;
+    bottom: auto;
+    left: 50%;
+    height: 83%;
+    width: min(975px, 100%);
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.launcher-search {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    box-sizing: border-box;
+    width: min(975px, calc(100% - 30px));
+    height: 52px;
+    padding: 0 20px;
+    transform: translateX(-50%);
+    border: 0;
+    border-radius: 14px;
+    outline: none;
+    color: var(--text);
+    background: var(--bg-2);
+    transition: background .18s ease, box-shadow .18s ease;
+}
+
+.launcher-search:focus {
+    background: var(--bg-3);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 .apps-container::-webkit-scrollbar,
@@ -1671,7 +1706,7 @@ span.online-count {
 
     .games-wrapper > br { display: none; }
 
-    .games-wrapper > #games-search {
+    .games-wrapper > .launcher-search {
         position: relative !important;
         inset: auto !important;
         transform: none !important;
@@ -1977,7 +2012,7 @@ span.online-count {
 
     .games-wrapper > br { display: none; }
 
-    .games-wrapper > #games-search {
+    .games-wrapper > .launcher-search {
         position: relative !important;
         inset: auto !important;
         transform: none !important;
@@ -2220,8 +2255,8 @@ span.online-count {
     .apps-wrapper > br,
     .games-wrapper > br { display: none; }
 
-    .apps-wrapper > #apps-search,
-    .games-wrapper > #games-search {
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search {
         position: relative !important;
         inset: auto !important;
         transform: none !important;
@@ -2310,8 +2345,8 @@ span.online-count {
 @media (max-width: 640px) {
     .apps-wrapper,
     .games-wrapper { width: 96vw; height: min(80vh, 720px); padding: 12px; }
-    .apps-wrapper > #apps-search,
-    .games-wrapper > #games-search { min-height: 40px; font-size: 14px; }
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search { min-height: 40px; font-size: 14px; }
     .apps-wrapper > .apps-container,
     .games-wrapper > .games-container { gap: 8px; }
 }
@@ -2338,10 +2373,11 @@ span.online-count {
         transform: translate(-50%, -50%) scale(1) !important;
     }
 
-    .apps-wrapper > #apps-search,
-    .games-wrapper > #games-search {
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search {
         align-self: stretch !important;
         flex-basis: auto;
+        height: 42px !important;
         max-width: 100% !important;
     }
 
@@ -2360,7 +2396,10 @@ span.online-count {
 
 @media (max-width: 640px) {
     .apps-wrapper > .apps-container,
-    .games-wrapper > .games-container { column-gap: 10px; row-gap: 10px; }
+    .games-wrapper > .games-container { column-gap: 12px; row-gap: 12px; }
+
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search { height: 40px !important; }
 
     /* Fit the Special Thanks panel to its content rather than leaving a blank
        lower half on phones; the list still scrolls if it grows beyond the cap. */

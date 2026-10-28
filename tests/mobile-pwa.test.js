@@ -331,10 +331,12 @@ test("phone game drawer has search, a four-column icon grid, and a separate play
   const html = read("index.html");
   const css = read("styles/index.css");
   assert.match(html, /id="games-search"/);
+  assert.match(html, /class="games-container"/);
+  assert.doesNotMatch(html, /class="games-container[^\"]*(?:w-\[|flex-wrap|absolute|left-1\/2)/);
   assert.match(html, /id="mobile-game-dialog"[\s\S]*?id="mobile-game-image"[\s\S]*?id="mobile-game-title"[\s\S]*?id="mobile-game-play"/);
   assert.match(html, /openMobileGame\(item\)/);
   assert.match(html, /graipOverlay=1/);
-  assert.match(css, /\.games-wrapper > #games-search\s*\{[\s\S]*?width:\s*100% !important/);
+  assert.match(css, /\.games-wrapper > \.launcher-search\s*\{[\s\S]*?width:\s*100% !important/);
   assert.match(css, /\.games-wrapper > \.games-container\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/);
   assert.match(css, /\.games-container \.game-launch-card::after/);
 });
