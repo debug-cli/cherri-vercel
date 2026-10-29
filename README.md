@@ -459,8 +459,9 @@ and the continuing UI and mobile fixes in [PR #4](https://github.com/debug-cli/g
   phones, improve the mobile Movies and Special Thanks layouts, and keep mobile-only overrides scoped
   so desktop styling is not inadvertently changed. The mobile shell uses a bottom navigation bar;
   feature pages retain their responsive layouts inside the shell.
-- **Motion and navigation:** start the saved fog effect as soon as the document is ready instead of
-  waiting for slower page subresources, synchronize fog with Reduced Motion, and remove Discord
+- **Motion and navigation:** start the default-on fog effect as soon as the document is ready instead
+  of waiting for slower page subresources (including on a first visit with no saved preference),
+  synchronize fog with Reduced Motion, and remove Discord
   navigation entries from the shell's first-party page menus on desktop and mobile.
 
 ## Credits

@@ -1805,8 +1805,13 @@ window.graipStartFog && window.graipStartFog()
             return parseInt(hex.replace("#", ""), 16)
         }
 
+        function isFogEnabled() {
+            // Fog is on by default; only an explicit "no" disables it.
+            return localStorage.getItem("graip_particlesOn") !== "no" && localStorage.getItem("graip_reduceMotion") !== "yes"
+        }
+
         window.graipStartFog = function () {
-            if (localStorage.getItem("graip_particlesOn") !== "yes" || localStorage.getItem("graip_reduceMotion") === "yes") return
+            if (!isFogEnabled()) return
             try {
                 let fogContainer = document.getElementById("vanta-fog-container")
                 if (!fogContainer) {
@@ -1838,13 +1843,11 @@ window.graipStartFog && window.graipStartFog()
         }
 
         window.graipRefreshFog = function () {
-            if (localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
-                window.graipStartFog()
-            }
+            if (isFogEnabled()) window.graipStartFog()
         }
 
         const startFogAfterLayout = () => {
-            if (localStorage.getItem("graip_particlesOn") === "yes" && localStorage.getItem("graip_reduceMotion") !== "yes") {
+            if (isFogEnabled()) {
                 requestAnimationFrame(() => requestAnimationFrame(() => window.graipStartFog()))
             }
         }

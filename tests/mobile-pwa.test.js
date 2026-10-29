@@ -361,6 +361,7 @@ test("theme changes rebuild enabled Vanta fog from the active palette", () => {
   const html = read("index.html");
   const dropdown = read("assets/js/dropdown.js");
   assert.match(html, /window\.graipRefreshFog = function/);
+  assert.match(html, /function isFogEnabled\(\)[\s\S]*?getItem\("graip_particlesOn"\) !== "no"[\s\S]*?getItem\("graip_reduceMotion"\) !== "yes"/);
   assert.match(html, /document\.addEventListener\("themeUpdated"/);
   assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
   assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
