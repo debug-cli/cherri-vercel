@@ -1406,8 +1406,13 @@ layouts are regression-sensitive; make the smallest local change and compare bot
 The Settings selectors are built from a wrapper, a selected-value element, and an initially empty
 options container. Their classes follow the selector contract in §13.3 (for example,
 `.theme-selector`, `.theme-selected`, `.theme-options`). `assets/js/dropdown.js`'s `createSelector()`
-creates option elements with `textContent`, closes other selectors, stores the chosen value, and emits
-the configured custom event. When adding a selector:
+takes `(selectorType, selectedEl, optionsEl, allOptions, currentVal, storageKey, eventName, successMsg)`;
+it sets the selected text, excludes the current choice from the generated options, closes other
+selectors, persists the selected value, optionally emits a `CustomEvent` and success toast, logs the
+setting action, and calls `runMenuCloak()` for the special `cloakLink` key. `backend` and `transport`
+values are lowercased before storage. The current option rows are clickable `<div>` elements and the
+helper does not provide keyboard or ARIA behavior, so add those explicitly when building an accessible
+new selector. When adding a selector:
 
 - Reuse this pattern and the shared `closeAllSelectors()` behavior rather than adding a second,
   incompatible dropdown implementation.
