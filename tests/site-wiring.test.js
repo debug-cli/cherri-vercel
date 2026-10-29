@@ -81,6 +81,16 @@ test("homepage splashes load from the colocated plain-text list", () => {
   assert.ok(worker.includes('"/assets/splashes/splashes.txt"'));
 });
 
+test("README badges use shieldcn for this repo and contain no shields.io images", () => {
+  const source = read("README.md");
+
+  assert.doesNotMatch(source, /shields\.io/);
+  assert.ok(source.includes("shieldcn.dev/github/stars/debug-cli/graip.svg"));
+  assert.ok(source.includes("shieldcn.dev/github/license/debug-cli/graip.svg"));
+  assert.ok(!source.includes("vercel/next.js"));
+  assert.ok(source.includes("Tests: 136 passing"));
+});
+
 test("homepage top bar opens the built-in movie browser", () => {
   const source = read("index.html");
 
