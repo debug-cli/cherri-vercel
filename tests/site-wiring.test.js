@@ -88,7 +88,17 @@ test("README badges use shieldcn for this repo and contain no shields.io images"
   assert.ok(source.includes("shieldcn.dev/github/stars/debug-cli/graip.svg"));
   assert.ok(source.includes("shieldcn.dev/github/license/debug-cli/graip.svg"));
   assert.ok(!source.includes("vercel/next.js"));
-  assert.ok(source.includes("Tests: 136 passing"));
+  assert.ok(source.includes("Tests: 137 passing"));
+});
+
+test("README renders a compact homepage screenshot, animated title, and changelog link", () => {
+  const source = read("README.md");
+
+  assert.ok(source.includes("readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=52&amp;duration=5000&amp;pause=1800&amp;repeat=true"));
+  assert.ok(source.includes("color=A78BFA"));
+  assert.ok(source.includes('<img src="assets/img/readme-homepage.png" width="780" alt="graip homepage screenshot">'));
+  assert.ok(fs.existsSync(path.join(ROOT, "assets/img/readme-homepage.png")));
+  assert.ok(source.includes('href="#changelog">Changelog</a>'));
 });
 
 test("homepage top bar opens the built-in movie browser", () => {

@@ -1,10 +1,16 @@
 <div align="center">
 
-<h1>graip</h1>
+<h1>
+  <a href="https://github.com/debug-cli/graip"><img alt="graip" src="https://readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=52&amp;duration=5000&amp;pause=1800&amp;repeat=true&amp;center=true&amp;vCenter=true&amp;width=500&amp;height=90&amp;lines=graip&amp;color=A78BFA"></a>
+</h1>
 
 <p>
   A static, deploy-anywhere web proxy and game site: 700+ games, a real multi-tab proxy browser,
   a movie browser, a panic key, and a debug log you can hand to a maintainer.
+</p>
+
+<p align="center">
+  <img src="assets/img/readme-homepage.png" width="780" alt="graip homepage screenshot">
 </p>
 
 <p align="center">
@@ -26,7 +32,7 @@
 
 <p align="center">
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Build-No_build_step-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Build: no build step" src="https://www.shieldcn.dev/badge/Build-No_build_step-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Tests-136_passing-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Tests: 136 passing" src="https://www.shieldcn.dev/badge/Tests-136_passing-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Tests-137_passing-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Tests: 137 passing" src="https://www.shieldcn.dev/badge/Tests-137_passing-22c55e.svg?variant=secondary&amp;size=sm&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Proxy-Scramjet_plus_Ultraviolet-8b5cf6.svg?variant=secondary&amp;size=sm&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Proxy: Scramjet + Ultraviolet" src="https://www.shieldcn.dev/badge/Proxy-Scramjet_plus_Ultraviolet-8b5cf6.svg?variant=secondary&amp;size=sm&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Transport-libcurl.js_plus_Wisp-0ea5e9.svg?variant=secondary&amp;size=sm&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Transport: libcurl.js + Wisp" src="https://www.shieldcn.dev/badge/Transport-libcurl.js_plus_Wisp-0ea5e9.svg?variant=secondary&amp;size=sm&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/badge/Hosting-Vercel-000000.svg?variant=branded&amp;size=sm&amp;logo=vercel&amp;mode=dark&amp;theme=purple&amp;font=jetbrains-mono"><img alt="Hosting: Vercel" src="https://www.shieldcn.dev/badge/Hosting-Vercel-000000.svg?variant=branded&amp;size=sm&amp;logo=vercel&amp;mode=light&amp;theme=purple&amp;font=jetbrains-mono"></picture>
@@ -53,6 +59,7 @@
   <a href="#deploy">Deploy</a> ·
   <a href="#self-hosting-a-wisp-server">Wisp</a> ·
   <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="#changelog">Changelog</a> ·
   <a href="#credits">Credits</a>
 </p>
 
