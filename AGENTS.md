@@ -36,7 +36,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (136 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (137 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -140,7 +140,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  136 dependency-free tests
+└── tests/                     13 files  137 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -1063,7 +1063,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 136 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 137 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1338,7 +1338,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 136/136, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 137/137, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1373,7 +1373,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` and this handbook (the suite now has 136 tests).
+- Added `tests/` and this handbook (the suite now has 137 tests).
 
 ---
 
@@ -1500,7 +1500,7 @@ When adding or updating badges:
   transport, Vercel hosting, Tailwind CDN usage, and the presence of this agent guide. Do not add
   sample badges for Next.js, React, TypeScript, package managers, or tools this repo does not use.
 - Keep the static Tests badge in sync with the real `node --test tests/*.test.js` result; it currently
-  reports **136 passing**. Run the full suite before changing that number.
+  reports **137 passing**. Run the full suite before changing that number.
 - There is no tracked GitHub Actions workflow in this repository today. Do not add a CI-status badge
   that implies a workflow exists; reassess if the repository gains CI later.
 - Replace any `shields.io` image badges with the corresponding ShieldCN image rather than mixing badge
@@ -1522,7 +1522,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 136 pass
+node --test tests/*.test.js | tail -3                              # 137 pass
 git ls-files | wc -l                                               # 8400
 ```
 
