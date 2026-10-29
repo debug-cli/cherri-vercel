@@ -42,7 +42,7 @@ self.addEventListener("activate", (event) => {
  * Bump SHELL_VERSION when the list or the shell's behaviour changes; activate
  * deletes every cache that does not match.
  */
-const SHELL_CACHE = "graip-shell-v6";
+const SHELL_CACHE = "graip-shell-v7";
 const SHELL_ASSETS = [
 	"/index.html",
 	"/newtab.html",
@@ -67,7 +67,8 @@ const SHELL_ASSETS = [
 	"/assets/js/proxy-errors.js",
 	"/assets/js/browserfunctions.js",
 	"/assets/js/debug-panel.js",
-	"/assets/js/splash.js",
+	"/assets/splashes/splash.js",
+	"/assets/splashes/splashes.txt",
 	"/assets/json/partners.json",
 	"/assets/json/config/particles.json",
 	"/assets/img/fav.png",

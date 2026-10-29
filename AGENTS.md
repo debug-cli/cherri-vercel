@@ -290,7 +290,7 @@ message in the page, not hang — `chatrooms.html` and `assistant.html` show the
 
 ```
 every page:      log.js  →  cloak.js  →  (page-specific)
-index.html:      wisp.js → colors.js → splash.js → debug-panel.js → proxy-errors.js
+index.html:      wisp.js → colors.js → assets/splashes/splash.js → debug-panel.js → proxy-errors.js
                  → browserfunctions.js → particles → dropdown.js → settings-io.js
 browser pages:   baremux/index.js → math.all.js → wisp.js → t.js → english.bundle.js
                  → proxy-errors.js → browserfunctions.js
@@ -546,13 +546,37 @@ picker and shows `chosen → fallback` while a failover is live.
 | `colors.js` | 12 | Applies `graip_theme` to `#css-theme-link` before paint; must tolerate a missing link (`404.html` regressed this once) |
 | `t.js` | 146 | `showToast(type, message, icon)`; creates `.toast-container` if absent, pauses timers on hover, stacks toasts |
 | `cursor.js` | 115 | ZXS cursor; `cursor()` starts it, disabling removes `#cursor-style-zxs`/`#cursor-thank-you-zxs` and all listeners |
-| `splash.js` | 88 | `splashes[]` array of hero strings; the shell picks one at random |
+| `assets/splashes/splash.js` | — | Fetches a UTF-8 line-based phrase list, picks one at random, and safely renders optional Markdown links |
+| `assets/splashes/splashes.txt` | 80 lines | Editable splash phrases, one per line; this is the copy source of truth |
 | `vm.js` | 118 | Legacy Hyperbeam launcher with `graip_vm_cooldown` (20 min); every lookup optional, no-ops on today's pages |
 | `chatrooms.js` | 129 | CometChat client (`api.x8r.dev` token). **Not loaded anywhere**; `chatrooms.html` uses socket.io. Dead code |
 | `lib/particles.js` | 963 | Vendored particles.js |
 | `lib/three.min.js` | 26,887 | Vendored three.js (Vanta dependency, `index.html` only) |
 | `lib/vanta.fog.min.js` | 440 | Vendored Vanta fog |
 | `lib/detectmobile.js` | 35 | `isMobile()` UA sniff; used only by vendored GN-Math pages |
+
+### 5.10 Updating splash phrases
+
+The splash copy is maintained in [`assets/splashes/splashes.txt`](assets/splashes/splashes.txt), next
+to its loader, [`assets/splashes/splash.js`](assets/splashes/splash.js). To change the rotating
+homepage phrases, edit the `.txt` file directly in any plain-text editor:
+
+1. Put exactly one splash on each line. The file is UTF-8; blank lines are ignored and surrounding
+   whitespace is trimmed. Do not add JSON quotes, commas, or array brackets.
+2. Use ordinary text by default. A clickable link can use the form
+   `[visible label](https://example.com)`; only HTTPS links are rendered as links, and they open in a
+   new tab with `noopener noreferrer`. Do not add raw HTML: the loader renders all other content as
+   text, so tags cannot execute or alter the page.
+3. Save the file, check that the new line appears once, then run
+   `node --test tests/*.test.js` and `git diff --check`. No JavaScript edit is needed for copy-only
+   changes.
+4. Keep both files together in `assets/splashes/`, update the shell script path in `index.html` if
+   the loader ever moves, and keep both assets in `sw.js` → `SHELL_ASSETS` so the splash works offline.
+   Bump `SHELL_CACHE` when changing the shell asset list or service-worker behavior, not merely to
+   change a phrase in the text file.
+
+Change `assets/splashes/splash.js` only when changing phrase-loading or rendering behavior. If doing
+so, retain the plain-text-by-default rendering and the HTTPS-only Markdown link behavior.
 
 ---
 
@@ -1339,7 +1363,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
 - Panic return point: the decoy reopens graip at the exact URL, page, drawer and settings panel the
   user left, instead of falling through to `/start.html` via `history.back()`.
 - Release stamp `v2.0.0 "juice"`: `<graipattr version>` in `index.html` (drives the update toast),
-  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v6`).
+  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v7`).
 - Exportable debug log (verbose on by default) and Debug/Backup settings panels.
 - Tab sessions restored after reload; omnibox shortcuts and bangs.
 - Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.

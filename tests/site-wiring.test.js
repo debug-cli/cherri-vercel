@@ -62,6 +62,25 @@ test("local asset references in first-party pages resolve", () => {
   assert.deepEqual(missing, [], `broken first-party references:\n${missing.join("\n")}`);
 });
 
+test("homepage splashes load from the colocated plain-text list", () => {
+  const shell = read("index.html");
+  const loader = read("assets/splashes/splash.js");
+  const list = read("assets/splashes/splashes.txt");
+  const worker = read("sw.js");
+  const phrases = list.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+  assert.ok(shell.includes('src="/assets/splashes/splash.js"'));
+  assert.ok(!shell.includes('src="/assets/js/splash.js"'));
+  assert.ok(loader.includes('fetch("/assets/splashes/splashes.txt")'));
+  assert.ok(loader.includes("document.createTextNode"));
+  assert.ok(loader.includes("noopener noreferrer"));
+  assert.doesNotMatch(loader, /\.innerHTML\s*=/);
+  assert.ok(phrases.includes("free snacks at level 10"));
+  assert.ok(phrases.includes("Also try [VAPOR!](https://vapor.my/)"));
+  assert.ok(worker.includes('"/assets/splashes/splash.js"'));
+  assert.ok(worker.includes('"/assets/splashes/splashes.txt"'));
+});
+
 test("homepage top bar opens the built-in movie browser", () => {
   const source = read("index.html");
 
@@ -247,7 +266,7 @@ test("the release version is 2.0.0 \"juice\" everywhere it is written", () => {
   assert.deepEqual(stale, [], `still advertising the old version: ${stale.join(", ")}`);
 
   // the shell cache name carries the release so a new build retires the old one
-  assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v6";/);
+  assert.match(read("sw.js"), /const SHELL_CACHE = "graip-shell-v7";/);
 });
 
 test("special thanks lists the README credits and settings categories can scroll", () => {

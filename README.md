@@ -463,6 +463,9 @@ and the continuing UI and mobile fixes in [PR #4](https://github.com/debug-cli/g
   of waiting for slower page subresources (including on a first visit with no saved preference),
   synchronize fog with Reduced Motion, and remove Discord
   navigation entries from the shell's first-party page menus on desktop and mobile.
+- **Editable splash phrases:** move the homepage splash loader and its UTF-8 phrase list into
+  `assets/splashes/`; edit `splashes.txt` with one phrase per line instead of changing JavaScript.
+  Optional HTTPS links use `[label](https://example.com)` syntax and render safely as links.
 
 ## Credits
 
