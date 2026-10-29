@@ -312,7 +312,7 @@ test("phone navigation fits a compact grid and toasts sit above the bottom bar",
   const css = read("styles/index.css");
   const phoneRules = css.split("@media (max-width: 640px)")[1].split("@media (max-width: 640px) and (orientation: landscape)")[0];
   const toastCss = read("assets/css/t.css");
-  assert.match(phoneRules, /grid-template-columns:\s*repeat\(10,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(phoneRules, /grid-template-columns:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(phoneRules, /height:\s*48px/);
   assert.match(toastCss, /@media \(max-width: 640px\)[\s\S]*?\.toast-container\s*\{[\s\S]*?top:\s*auto !important;[\s\S]*?bottom:\s*calc\(48px/);
 });
@@ -325,4 +325,101 @@ test("mobile home search icon sits inline with the placeholder and nav logo is c
   assert.match(phoneRules, /#homesearch\s*\{[^}]*flex:\s*1 1 auto/);
   assert.match(phoneRules, /nav ul li:first-child a\s*\{[^}]*margin:\s*0 !important/);
   assert.match(phoneRules, /nav ul li:first-child img\s*\{[^}]*margin:\s*0 !important/);
+});
+
+test("phone game drawer has search, a four-column icon grid, and a separate play dialog", () => {
+  const html = read("index.html");
+  const css = read("styles/index.css");
+  assert.match(html, /id="games-search"/);
+  assert.match(html, /class="games-container launcher-grid"/);
+  assert.doesNotMatch(html, /class="games-container[^\"]*(?:w-\[|flex-wrap|absolute|left-1\/2)/);
+  assert.match(html, /id="mobile-game-dialog"[\s\S]*?id="mobile-game-image"[\s\S]*?id="mobile-game-title"[\s\S]*?id="mobile-game-play"/);
+  assert.match(html, /openMobileGame\(item\)/);
+  assert.match(html, /graipOverlay=1/);
+  assert.match(css, /\.games-wrapper > \.launcher-search\s*\{[\s\S]*?width:\s*100% !important/);
+  assert.match(css, /\.games-wrapper > \.launcher-grid\s*\{[\s\S]*?display:\s*flex !important[\s\S]*?gap:\s*12px/);
+  assert.match(css, /\.launcher-grid > \.app\s*\{[\s\S]*?flex:\s*0 0 calc\(\(100% - 36px\) \/ 4\) !important[\s\S]*?aspect-ratio:\s*1/);
+  assert.match(css, /\.games-container \.game-launch-card::after/);
+});
+
+test("game overlay widgets are opt-in, lazy-load the mini browser, and exit to Graip", () => {
+  const play = read("pages/play.html");
+  const shell = read("index.html");
+  const overlayCss = read("assets/css/overlay.css");
+  assert.match(play, /const openedFromGamesMenu = urlParams\.get\('graipOverlay'\) === '1'/);
+  assert.match(play, /useOverlay === "yes" && gameurl && openedFromGamesMenu/);
+  assert.match(play, /id="browser-widget" hidden/);
+  assert.doesNotMatch(play.match(/<section class="overlay-browser-window"[\s\S]*?<\/section>/)[0], /<iframe[^>]+src=/);
+  assert.match(play, /if \(frame && !frame\.getAttribute\("src"\)\)/);
+  assert.match(play, /exitGameToGraip\(\)/);
+  assert.match(shell, /event\.data\.type === "graip-exit-game"\) navTo\("home\?launch=1"\)/);
+  assert.match(overlayCss, /#gameOverlay\.active \.overlay-widget-toolbar/);
+  assert.match(overlayCss, /\.overlay-widget-toggle\.is-on/);
+});
+
+test("theme changes rebuild enabled Vanta fog from the active palette", () => {
+  const html = read("index.html");
+  const dropdown = read("assets/js/dropdown.js");
+  assert.match(html, /window\.graipRefreshFog = function/);
+  assert.match(html, /function isFogEnabled\(\)[\s\S]*?getItem\("graip_particlesOn"\) !== "no"[\s\S]*?getItem\("graip_reduceMotion"\) !== "yes"/);
+  assert.match(html, /document\.addEventListener\("themeUpdated"/);
+  assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
+  assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
+  assert.match(html, /const startFogAfterLayout = \(\) =>[\s\S]*?window\.graipStartFog\(\)[\s\S]*?document\.readyState === "loading"[\s\S]*?document\.addEventListener\("DOMContentLoaded", startFogAfterLayout/);
+  assert.doesNotMatch(html, /window\.addEventListener\("load", startFogAfterLayout/);
+  assert.match(dropdown, /theme: localStorage\.getItem\("graip_theme"\) \|\| "midnight"/);
+  assert.match(dropdown, /Theme and fog colors updated/);
+});
+
+test("chatroom button is removed and AI chat reserves space below the shell toolbar", () => {
+  const shell = read("index.html");
+  const assistant = read("pages/assistant.html");
+  const mobile = read("assets/css/mobile.css");
+  const shellCss = read("styles/index.css");
+  assert.doesNotMatch(shell, /data-page="chatrooms"/);
+  assert.doesNotMatch(shell, /AI is in beta/);
+  assert.match(shellCss, /repeat\(8, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
+  assert.match(assistant, /<body class="assistant-page">/);
+  assert.match(mobile, /assistant-page \.messages-container\s*\{\s*top:\s*68px/);
+  assert.match(mobile, /assistant-page > \.container\s*\{\s*position:\s*fixed/);
+  assert.match(mobile, /bottom: calc\(58px \+ env\(safe-area-inset-bottom/);
+  assert.doesNotMatch(mobile, /#particles-container\s*\{\s*display:\s*none/);
+});
+
+test("settings version fade remains confined to the category rail", () => {
+  const css = read("styles/index.css");
+  const docs = read("AGENTS.md");
+  assert.match(css, /\.settings-sidebar::after\s*\{[\s\S]*?backdrop-filter:\s*blur\(7px\)[\s\S]*?mask-image:\s*linear-gradient/);
+  assert.match(css, /\.settings-sidebar::after \{ display: none; \}/);
+  assert.match(css, /\.partners-wrapper\s*\{[\s\S]*?height:\s*auto;[\s\S]*?max-height:\s*70vh/);
+  assert.match(css, /\.special-thanks-grid\s*\{[\s\S]*?height:\s*auto;[\s\S]*?overflow-y:\s*auto/);
+  assert.match(docs, /### 11\.2 Reading a settings JSON file/);
+  assert.match(docs, /\| `graip_wispUrlCustom` \| User-supplied WebSocket endpoint/);
+  assert.match(docs, /\| `graip_panicOpenIn` \| Whether panic opens in the same tab or a new tab/);
+});
+
+test("mobile apps share the compact squircle launcher grid and Discord is removed from navigation", () => {
+  const shell = read("index.html");
+  const css = read("styles/index.css");
+  assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
+  for (const page of ["pages/apps.html", "pages/games.html", "pages/movieframe.html", "pages/partners.html"]) {
+    assert.doesNotMatch(read(page), /ri-discord-fill|discord\.gg/);
+  }
+  assert.match(css, /\.apps-wrapper > \.apps-container,[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.apps-container > \.app,[\s\S]*?aspect-ratio:\s*1/);
+  assert.match(css, /\.apps-container > \.app::after/);
+  assert.match(shell, /class="apps-container launcher-grid"/);
+  assert.match(css, /\.apps-wrapper > \.launcher-grid,[\s\S]*?\.games-wrapper > \.launcher-grid\s*\{[\s\S]*?display:\s*flex !important[\s\S]*?gap:\s*12px/);
+});
+
+test("movies page has independent responsive layout and bounded visible loading state", () => {
+  const movies = read("pages/movies.html");
+  assert.doesNotMatch(movies, /cdn\.tailwindcss|alpinejs/);
+  assert.match(movies, /assets\/js\/colors\.js/);
+  assert.match(movies, /class="movie-status"[\s\S]*?Loading movies/);
+  assert.match(movies, /AbortController\(\)/);
+  assert.match(movies, /movie-search/);
+  assert.match(movies, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(movies, /aria-pressed/);
 });

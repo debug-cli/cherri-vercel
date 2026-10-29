@@ -25,6 +25,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
 | Touching cloaking, panic or tabs | §12 cloaking, §5.5 tab engine |
 | Chasing a bug | §20 debugging cookbook, §22 traps, §23 sweep findings |
 | Adding a feature | §21 conventions, §24 playbooks, then the relevant subsystem |
+| Changing shell or page UI, dropdowns, or switches | §27 UI architecture and contribution patterns |
 | Reviewing a PR | §25 invariants checklist |
 
 **Hard rules that no section overrides** — if you only remember four things:
@@ -34,7 +35,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (125 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (134 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -138,7 +139,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  125 dependency-free tests
+└── tests/                     13 files  134 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -173,7 +174,7 @@ external). It is the app.
 | Line | Element | Role |
 | --- | --- | --- |
 | 73 | `#gohomeblock` | Floating "back to home" button shown while a page is open |
-| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, chat, partners, settings, Discord. The `gmbl` (gambling) entry is commented out |
+| 76–154 | `<nav>` | Sidebar: home, games, apps, movies, VMs, AI, partners, settings. Chatrooms remains a direct page but has no sidebar button; Discord has no navigation button. The `gmbl` entry is commented out |
 | 156 | `#homeContent` | Hero: logo, splash text, search box, visitor count |
 | 179 | `#contentFrame` | The iframe every page loads into (`navTo`) |
 | 181 | `.settings-container.settings-hidden` | The settings sheet (fixed 625 px) |
@@ -510,7 +511,7 @@ There is also a one-time migration: `graip_searchEngineGoogleDefaultV1` rewrites
 
 Backend-free settings backup. Full format spec in §11. Structural notes:
 
-- `SCHEMA` (24 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
+- `SCHEMA` (23 entries) is the allowlist; `IGNORED` lists runtime keys that must never travel;
   `graip_tabs*` is skipped by prefix.
 - `sanitize(entry, raw)` is the only writer path and returns `{ ok, value }` / `{ ok: false, reason }`.
 - `apply(input)` merges: absent keys untouched, `null`/`""` on optional keys ignored, unchanged values
@@ -626,7 +627,7 @@ Custom events on `document` (from `dropdown.js`) and `window` (from `wisp.js`):
 
 | Event | Target | `detail` | Producer | Consumer |
 | --- | --- | --- | --- | --- |
-| `themeUpdated` | `document` | theme name | `dropdown.js` | `dropdown.js` (swaps `#css-theme-link`) |
+| `themeUpdated` | `document` | theme name | `dropdown.js` | `dropdown.js` (swaps `#css-theme-link`), `index.html` (rebuilds enabled Fog with the new theme colors) |
 | `decoyUpdated` | `document` | profile name | `dropdown.js` | `dropdown.js` → `GraipCloak.applyCloak` |
 | `storeUpdated` | `document` | `Classplay`/`GN-Math` | `dropdown.js` | `index.html` (reloads the games grid) |
 | `wispUpdated` | `document` | endpoint | `dropdown.js` | `dropdown.js` (`selectWisp`) |
@@ -799,7 +800,7 @@ timeout, `libcurl_abort` path).
 Accepted inputs on import: this object, the same object without the wrapper (a bare map), or either as
 a JSON string. `MAX_BYTES` = 64 KiB.
 
-### 11.1 Schema (22 keys)
+### 11.1 Schema (23 keys)
 
 | Group | Keys | Type |
 | --- | --- | --- |
@@ -809,7 +810,46 @@ a JSON string. `MAX_BYTES` = 64 KiB.
 | gaming | `graip_gameStore`, `graip_useOverlay`, `graip_confirmLeave` | token, bool, bool |
 | logging | `graip_verboseLogs` | bool (`on`/`off`) |
 
-### 11.2 Validation rules (the security boundary)
+### 11.2 Reading a settings JSON file
+
+Treat the file as a versioned backup envelope. The top-level `format` identifies it as a Graip settings
+backup; `version` is the envelope/schema generation (currently `1`); `exportedAt` is when the file
+was created; `site` records the Graip origin that made it. The `settings` object is the actual map of
+setting key to saved value. Keys deliberately match Graip's preference keys, so use the table below
+as a legend. Values are strings in the format expected by storage, not labels to display verbatim.
+The file does not include browsing history, open tabs, debug logs, or runtime Wisp health data.
+
+| JSON key | Meaning of its value |
+| --- | --- |
+| `graip_theme` | Theme name; `midnight` is the default. |
+| `graip_reduceMotion` | `yes` disables animations, Fog and the custom cursor; `no` permits their separate controls. |
+| `graip_particlesOn` | Whether the animated Vanta Fog background is enabled (`yes`/`no`). |
+| `graip_customCursor` | Whether the custom circle cursor is enabled (`yes`/`no`). |
+| `graip_wispUrlSelected` | Identifier of the selected Wisp route, or `Custom`/`Local`. |
+| `graip_wispUrlCustom` | User-supplied WebSocket endpoint (`wss://…`) used for a custom route. |
+| `graip_backend` | Proxy engine selection: `scramjet` or `ultraviolet`. |
+| `graip_searchEngine` | Search provider used for address-bar searches. |
+| `decoy` | Cloak profile name used for the tab title/icon disguise. |
+| `graip_cloakTitle` | Optional custom tab title for a cloak. |
+| `graip_cloakIcon` | Optional icon URL/path for a cloak. |
+| `graip_cloakProfile` | Selected built-in cloak profile. |
+| `graip_panicEnabled` | Whether the panic key is enabled. |
+| `graip_panicKey` | Configured keyboard key for panic activation. The key value is not a keystroke history. |
+| `graip_panicTarget` | Preset destination chosen for panic activation. |
+| `graip_panicTargetUrl` | Custom panic destination URL, when selected. |
+| `graip_panicOpenIn` | Whether panic opens in the same tab or a new tab. |
+| `graip_panicShowDecoy` | Whether to show the decoy page during panic. |
+| `graip_autoAB` | Whether automatic `about:blank` cloaking is enabled. |
+| `graip_gameStore` | Game catalog selection (`Classplay` or `GN-Math`). |
+| `graip_useOverlay` | Whether the optional game overlay is enabled. |
+| `graip_confirmLeave` | Whether Graip asks before leaving the page. |
+| `graip_verboseLogs` | Whether routine debug/action logs are recorded (`on`/`off`). |
+
+A bare map containing those keys is also accepted for import. Unknown keys and invalid values are
+reported and skipped; missing keys are left unchanged. Never assume the input is trusted: `sanitize()`
+validates each entry before storage is written.
+
+### 11.3 Validation rules (the security boundary)
 
 | Type | Accepts | Rejects |
 | --- | --- | --- |
@@ -825,7 +865,7 @@ a JSON string. `MAX_BYTES` = 64 KiB.
 Control characters are rejected for every type. `null`/`""` on an optional key means "leave it alone",
 not "clear it".
 
-### 11.3 Merge and side effects
+### 11.4 Merge and side effects
 
 - Absent key → untouched. Invalid → skipped and reported. Same value → counted as unchanged, not
   rewritten.
@@ -998,7 +1038,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 125 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 134 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1014,7 +1054,7 @@ node --test tests/*.test.js        # 125 tests, ~5 s, no dependencies, no networ
 | `page-bootstrap.test.js` | 11 | Every page boots with missing DOM/globals |
 | `site-wiring.test.js` | 10 | Asset refs resolve, nav targets exist, sidebar ↔ panels, no missing `/pages/*.html`, counter cannot throw, `<head>` structure, no duplicate `<script src>`, release version |
 | `panic-log.test.js` | 32 | Log filtering/redaction, panic matching/navigation, decoy structure, the return path (`returnUrl`/`leave` run against a fake document), `GraipShellState` capture/restore/resume, cloak profiles, tab restore, omnibox |
-| `mobile-pwa.test.js` | 10 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
+| `mobile-pwa.test.js` | 17 | Media-query-only CSS, desktop untouched, manifest, SW shell caching, library placeholders |
 | `settings-io.test.js` | 28 | Allowlist, validation, partial imports, reset, failure paths, panel wiring |
 
 Conventions that make these work — follow them, they cost nothing:
@@ -1273,7 +1313,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 125/125, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 134/134, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1299,7 +1339,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
 - Panic return point: the decoy reopens graip at the exact URL, page, drawer and settings panel the
   user left, instead of falling through to `/start.html` via `history.back()`.
 - Release stamp `v2.0.0 "juice"`: `<graipattr version>` in `index.html` (drives the update toast),
-  the settings footer, the Updates panel and `SHELL_CACHE = graip-shell-v2`.
+  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v6`).
 - Exportable debug log (verbose on by default) and Debug/Backup settings panels.
 - Tab sessions restored after reload; omnibox shortcuts and bangs.
 - Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.
@@ -1308,7 +1348,113 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (125 tests) and this handbook.
+- Added `tests/` (134 tests) and this handbook.
+
+---
+
+## 27. UI architecture and contribution patterns
+
+This section is the practical map for visual changes. Keep the HTML-first, static-site model: there is
+no app bundler or component framework. The shell is assembled in `index.html` (markup plus inline
+scripts), styled primarily by `styles/index.css`, and enhanced by shared scripts in `assets/js/`.
+Feature pages are separate HTML documents under `pages/`, usually shown in the shell's
+`#contentFrame`; some can also be opened directly. `assets/css/elements.css` provides shared styles
+for those pages, while feature-specific styles may live in the page or a dedicated stylesheet. A few
+legacy pages use utility classes from the Tailwind CDN; that is a dependency of those pages, not the
+preferred way to build new UI. Use existing CSS and theme tokens instead of adding a library.
+
+### 27.1 Desktop and mobile are intentionally different
+
+The mobile UI is not simply a shrunken desktop layout. Preserve established interaction differences
+and keep phone-only corrections inside the mobile media queries described in §13.2. Do not move a
+mobile fix to a top-level rule to make it easier to write; that can change desktop.
+
+| Area | Desktop | Mobile / narrow viewport |
+| --- | --- | --- |
+| Shell navigation | Compact navigation sits at the top of the shell. | Navigation becomes the fixed bottom bar; keep page content and controls clear of it and of device safe areas. |
+| Settings | A centered settings sheet with a side category list and a content pane. | Categories and settings content stack/scroll in the available viewport; controls must remain reachable without horizontal overflow. |
+| Apps and Games | Launcher panels use the shared tile system and keep the established desktop activation behavior. | Search and tiles fit the viewport; the shared `.launcher-grid` keeps a consistent four-across tile layout where space permits. Games show the mobile details dialog before the Play action. |
+| Movies | The feature page uses its desktop card grid and controls. | Cards reflow to fewer columns and controls remain touch-sized; preserve the current Movies composition when editing other pages. |
+| Special Thanks | Cards use the desktop panel and grid dimensions. | The panel grows with its contents and the cards use the compact phone layout rather than being clipped. |
+| Feature pages in the shell | Page documents render in the content iframe and retain their feature-specific desktop layout. | The same page documents use responsive rules (often from `assets/css/mobile.css`); test the page in the shell as well as standalone if its navigation or sizing depends on the shell. |
+
+This table records interaction and layout contracts, not pixel-perfect dimensions. Before changing a
+feature, inspect its current markup and the matching selectors in `styles/index.css`,
+`assets/css/elements.css`, `assets/css/mobile.css`, or its own page. The approved Apps/Games and Movies
+layouts are regression-sensitive; make the smallest local change and compare both viewport classes.
+
+### 27.2 Where to make a visual change
+
+1. **Shell structure or shell behavior:** edit the relevant markup in `index.html`; shared settings,
+   dropdown, logging, and navigation helpers are in `assets/js/`. Keep shell-only styling in
+   `styles/index.css`.
+2. **A standalone/iframe feature:** edit its `pages/<feature>.html` and feature stylesheet, if any.
+   Shared page chrome belongs in `assets/css/elements.css`; shared phone overrides belong in
+   `assets/css/mobile.css` (max-width 644 px). Do not assume a page's CSS is inherited from the shell:
+   the iframe has its own document and stylesheet cascade.
+3. **Theme-sensitive colors:** use the variables from §13.1 (`--bg*`, `--border*`, `--text`,
+   `--bright-text`, `--accent`, `--accent-2`) rather than hard-coded palette colors. Theme selection
+   swaps the root theme stylesheet, so hard-coded colors will not adapt.
+4. **Icons:** reuse the icon libraries already loaded by the page and provide accessible text/labels
+   for icon-only controls. Do not add or edit vendored assets just to change markup.
+5. **Responsive behavior:** add narrow-viewport rules inside the existing media query. Keep the
+   unqualified/base rule responsible for desktop, and add the corresponding mobile override only when
+   needed. Prefer `min-width: 0`, wrapping, and bounded widths over viewport-wide overflow.
+
+### 27.3 Dropdown / selector pattern
+
+The Settings selectors are built from a wrapper, a selected-value element, and an initially empty
+options container. Their classes follow the selector contract in §13.3 (for example,
+`.theme-selector`, `.theme-selected`, `.theme-options`). `assets/js/dropdown.js`'s `createSelector()`
+takes `(selectorType, selectedEl, optionsEl, allOptions, currentVal, storageKey, eventName, successMsg)`;
+it sets the selected text, excludes the current choice from the generated options, closes other
+selectors, persists the selected value, optionally emits a `CustomEvent` and success toast, logs the
+setting action, and calls `runMenuCloak()` for the special `cloakLink` key. `backend` and `transport`
+values are lowercased before storage. The current option rows are clickable `<div>` elements and the
+helper does not provide keyboard or ARIA behavior, so add those explicitly when building an accessible
+new selector. When adding a selector:
+
+- Reuse this pattern and the shared `closeAllSelectors()` behavior rather than adding a second,
+  incompatible dropdown implementation.
+- Add the wrapper/selected/options markup in the appropriate Settings page, with a unique selector
+  type and storage key; wire its initialization alongside the existing `createSelector()` calls.
+- Enumerate allowed values in code. Normalize values only where the existing storage contract
+  requires it, and listen for the event where dependent UI must refresh.
+- Match the selector's open/closed CSS states in `assets/css/dropdown.css` or the shell stylesheet as
+  appropriate. Keep the options usable on touch screens and within the viewport.
+- Include button-like keyboard operation, focus visibility, and `aria-expanded` / `aria-controls` (or
+  an equivalent accessible pattern) when introducing a new selector; do not copy missing accessibility
+  behavior just because a legacy selector lacks it. Use DOM APIs and `textContent` for option labels,
+  never HTML interpolation for values.
+- Log a settings change through `GraipLog.action("settings", ...)` without logging typed content,
+  destinations, or other private values. Add/update the relevant test for persistence and emitted events.
+
+### 27.4 Switch / checkbox pattern
+
+Use a native checkbox inside the existing `.switch` label and the existing `.slider` / `.circle`
+structure. Give it a stable, unique `id`, a visible nearby heading and explanation, and a real label
+(or an `aria-label` when the design cannot show one). Native checkbox semantics preserve keyboard
+and assistive-technology support; do not replace the input with a clickable `div`.
+
+For a new persistent switch, initialize its checked state from its documented storage key during page
+startup and have one named change handler own persistence and side effects. Follow existing Settings
+conventions: validate dependencies (for example, Reduced Motion can disable motion features), keep the
+control state synchronized when a parent setting changes, dispatch an event if another subsystem needs
+to react, and record the setting action with `GraipLog`. Never log keystrokes, entered text, or link
+destinations. Provide a disabled-state explanation if a parent preference makes the switch unavailable.
+
+### 27.5 UI change checklist
+
+- Identify whether the element belongs to the shell or to an iframe page; update the correct document
+  and stylesheet.
+- Preserve desktop behavior when a request is mobile-only; scope mobile overrides as §13.2 requires.
+- Check the phone layout around the bottom navigation, settings sheet, and safe areas; check desktop
+  at a wide viewport too. Test keyboard focus and reduced-motion behavior for interactive controls.
+- For dropdowns/switches, verify initial saved state, change handling, persistence, logging privacy,
+  and any dependent event or visual state.
+- Add regression tests to `tests/`, run `node --test tests/*.test.js`, and run `git diff --check`.
+  A passing source test is not a substitute for visually verifying the deployed preview when the fix
+  concerns appearance or rendering.
 
 ---
 
@@ -1321,7 +1467,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 125 pass
+node --test tests/*.test.js | tail -3                              # 134 pass
 git ls-files | wc -l                                               # 8400
 ```
 

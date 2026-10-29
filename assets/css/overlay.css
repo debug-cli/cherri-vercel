@@ -153,3 +153,184 @@
 #vm-frame {
     cursor: none !important;
 }
+/* Game overlay controls: all widgets and this toolbar are descendants of the
+   initially hidden #gameOverlay, so none of this chrome appears outside Alt+G. */
+#gameOverlay {
+    z-index: 10000;
+}
+
+.overlay-widget-toolbar {
+    position: fixed;
+    z-index: 20;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.15);
+}
+
+.overlay-widget-toggle {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 50%;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-2) 72%, transparent);
+    font-size: 18px;
+    transition: background .15s, color .15s, transform .15s;
+}
+
+.overlay-widget-toggle.is-on {
+    color: var(--bg);
+    background: color-mix(in srgb, var(--text) 88%, white 12%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.38), 0 2px 8px rgba(0,0,0,.18);
+}
+
+.overlay-widget-toggle:active { transform: scale(.94); }
+.overlay-widget-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.overlay-browser-window {
+    position: absolute;
+    z-index: 18;
+    right: 16px;
+    bottom: 68px;
+    display: flex;
+    flex-direction: column;
+    width: min(440px, 48vw);
+    height: min(520px, 62vh);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.26);
+    border-radius: 18px;
+    background: var(--bg);
+    box-shadow: 0 16px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.14);
+}
+
+.overlay-browser-window[hidden] { display: none !important; }
+
+.overlay-browser-drag-handle {
+    display: flex;
+    flex: 0 0 38px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px 0 12px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-2) 84%, transparent);
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    font-size: 12px;
+    font-weight: 650;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.overlay-browser-drag-handle:active { cursor: grabbing; }
+.overlay-browser-drag-handle span { display: flex; align-items: center; gap: 7px; }
+.overlay-browser-close { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: var(--text); background: transparent; }
+.overlay-browser-close:hover { background: var(--bg-3); }
+
+#browser-widget .proxy-widget {
+    position: relative;
+    inset: auto;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    border: 0;
+    border-radius: 0;
+}
+
+@media (max-width: 640px) {
+    #gameOverlay.active .overlay-widget-toolbar {
+        bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        gap: 5px;
+        padding: 5px;
+    }
+
+    #gameOverlay.active .overlay-widget-toggle {
+        width: 38px;
+        height: 38px;
+        font-size: 17px;
+    }
+
+    #gameOverlay.active .record-widget {
+        top: 8px;
+        left: 8px;
+        box-sizing: border-box;
+        width: 106px;
+        height: 80px;
+        padding: 7px;
+        border-radius: 17px;
+    }
+
+    #gameOverlay.active .record-widget h1,
+    #gameOverlay.active .game-controls h1 {
+        display: none;
+    }
+
+    #gameOverlay.active .record-widget button,
+    #gameOverlay.active .game-controls button {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        margin: 2px;
+        border-radius: 11px;
+        font-size: 16px;
+    }
+
+    #gameOverlay.active .game-controls {
+        top: 8px;
+        right: 8px;
+        box-sizing: border-box;
+        height: 80px;
+        max-width: calc(100vw - 126px);
+        padding: 7px;
+        border-radius: 17px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #gameOverlay.active .graip-info {
+        top: 94px;
+        left: 50%;
+        width: min(94vw, 360px);
+        height: auto;
+        padding: 8px 10px;
+        transform: translateX(-50%);
+        font-size: 11px;
+        line-height: 1.35;
+        border-radius: 14px;
+    }
+
+    #gameOverlay.active .overlay-browser-window {
+        left: 5vw;
+        right: auto;
+        bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+        width: 90vw;
+        height: min(48vh, 390px);
+        border-radius: 15px;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    #gameOverlay.active .overlay-widget-toolbar { bottom: 5px; gap: 4px; padding: 4px; }
+    #gameOverlay.active .overlay-widget-toggle { width: 34px; height: 34px; }
+    #gameOverlay.active .record-widget,
+    #gameOverlay.active .game-controls { top: 5px; height: 60px; }
+    #gameOverlay.active .record-widget { width: 88px; }
+    #gameOverlay.active .record-widget button,
+    #gameOverlay.active .game-controls button { width: 30px; height: 30px; }
+    #gameOverlay.active .game-controls { max-width: calc(100vw - 104px); }
+    #gameOverlay.active .overlay-browser-window { width: min(430px, 46vw); height: 55vh; bottom: 50px; }
+}

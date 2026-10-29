@@ -250,6 +250,7 @@ nav ul li.disabled {
 
 .version-tag {
     position: absolute;
+    z-index: 3;
     bottom: 15px;
     left: 17.5px;
     font-size: 14px;
@@ -268,6 +269,20 @@ nav ul li.disabled {
     overflow-x: hidden;
     scrollbar-width: thin;
     overscroll-behavior: contain;
+}
+
+.settings-sidebar::after {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 68px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent 0%, color-mix(in srgb, var(--bg) 62%, transparent) 48%, color-mix(in srgb, var(--bg) 94%, transparent) 100%);
+    backdrop-filter: blur(7px);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 72%);
 }
 
 .settings-section {
@@ -691,7 +706,42 @@ p a:hover {
 
 .apps-container,
 .games-container {
-    width: 975px;
+    position: absolute;
+    top: 75px;
+    bottom: auto;
+    left: 50%;
+    height: 83%;
+    width: min(975px, 100%);
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.launcher-search {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    box-sizing: border-box;
+    width: min(975px, calc(100% - 30px));
+    height: 52px;
+    padding: 0 20px;
+    transform: translateX(-50%);
+    border: 0;
+    border-radius: 14px;
+    outline: none;
+    color: var(--text);
+    background: var(--bg-2);
+    transition: background .18s ease, box-shadow .18s ease;
+}
+
+.launcher-search:focus {
+    background: var(--bg-3);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 .apps-container::-webkit-scrollbar,
@@ -1637,7 +1687,88 @@ span.online-count {
    (phones).
    --------------------------------------------------------------------------- */
 
+/* The mobile-only game details dialog must never leak into the desktop layout. */
+.mobile-game-dialog { display: none; }
+
 @media (max-width: 900px) {
+
+    /* Responsive game drawer: keep its search field and four-column grid inside
+       landscape phone/tablet viewports as well as portrait phones. */
+    .games-wrapper {
+        box-sizing: border-box;
+        width: min(96vw, 720px);
+        height: min(82vh, 740px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 14px;
+    }
+
+    .games-wrapper > br { display: none; }
+
+    .games-wrapper > .launcher-search {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: block;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        width: 100% !important;
+        min-height: 42px;
+        margin: 0 0 12px !important;
+    }
+
+    .games-wrapper > .games-container {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-content: start;
+        gap: 10px;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 4px;
+        scrollbar-width: thin;
+    }
+
+    .games-container > br { display: none; }
+    .games-container .game-launch-card {
+        width: auto;
+        height: auto;
+        aspect-ratio: 1;
+        margin: 0;
+        border-radius: 25%;
+        background: var(--bg-2);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 1px 0 0 rgba(255,255,255,.2), 0 5px 14px rgba(0,0,0,.25);
+        outline: 1px solid rgba(255,255,255,.17);
+        outline-offset: -1px;
+    }
+    .games-container .game-launch-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,.26), rgba(255,255,255,.07) 13%, transparent 31%);
+        opacity: .72;
+    }
+    .games-container .game-launch-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .games-container .game-launch-card .bg-img { border-radius: inherit; }
+    .games-container .game-launch-card .app-title-cont { display: none; }
+
+    .mobile-game-dialog { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .mobile-game-dialog.is-open { display: flex; }
+    .mobile-game-dialog-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.62); backdrop-filter: blur(8px); }
+    .mobile-game-dialog-panel { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(100%, 340px); padding: 24px; border: 1px solid rgba(255,255,255,.2); border-radius: 24px; background: color-mix(in srgb, var(--bg) 86%, transparent); box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18); text-align: center; }
+    .mobile-game-dialog-close { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; color: var(--text); background: var(--bg-3); font-size: 20px; }
+    .mobile-game-dialog-panel > img { width: 104px; height: 104px; border-radius: 25%; object-fit: cover; box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 20px rgba(0,0,0,.35); }
+    .mobile-game-dialog-panel h2 { max-width: 100%; margin: 0; color: var(--bright-text); font-size: 20px; overflow-wrap: anywhere; }
+    .mobile-game-play { width: 100%; min-height: 46px; border: 1px solid color-mix(in srgb, var(--accent) 65%, white 35%); border-radius: 999px; color: white; background: var(--accent); font-size: 16px; font-weight: 700; }
 
     /* the settings sheet has a fixed 625px body; let it breathe */
     .settings-container,
@@ -1676,7 +1807,7 @@ span.online-count {
 
     nav ul {
         display: grid;
-        grid-template-columns: repeat(10, minmax(0, 1fr));
+        grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: 1px;
         width: 100%;
         height: 100%;
@@ -1797,8 +1928,17 @@ span.online-count {
         display: none;
     }
 
-    .partners-wrapper { width: min(94vw, 500px); height: min(70vh, 620px); }
-    .special-thanks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .settings-sidebar::after { display: none; }
+
+    .partners-wrapper { width: min(94vw, 500px); height: min(70vh, 620px); padding: 12px; }
+    .partners-wrapper > br { display: none; }
+    .special-thanks-title { margin: 0 0 6px; font-size: 22px; }
+    .special-thanks-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: calc(100% - 34px); padding: 10px; }
+    .special-thanks-card { min-height: 96px; padding: 8px; gap: 7px; border-radius: 14px; }
+    .special-thanks-card img { width: 48px; height: 48px; }
+    .special-thanks-card span { font-size: 11px; }
+    .special-thanks-tools { grid-column: 1 / -1; min-height: 60px; }
+    .special-thanks-tools i { font-size: 22px; }
 
     .settings-section {
         white-space: nowrap;
@@ -1859,6 +1999,173 @@ span.online-count {
     .app .app-title-cont h2 {
         font-size: 13px;
     }
+
+    .games-wrapper {
+        box-sizing: border-box;
+        width: 96vw;
+        height: min(80vh, 720px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 14px;
+    }
+
+    .games-wrapper > br { display: none; }
+
+    .games-wrapper > .launcher-search {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: block;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        width: 100% !important;
+        min-height: 42px;
+        margin: 0 0 12px !important;
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    .games-wrapper > .games-container {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-content: start;
+        justify-content: stretch;
+        gap: 9px;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 3px;
+        scrollbar-width: thin;
+        overscroll-behavior: contain;
+    }
+
+    .games-container > br { display: none; }
+
+    .games-container .game-launch-card {
+        width: auto;
+        height: auto;
+        min-width: 0;
+        aspect-ratio: 1;
+        margin: 0;
+        border-radius: 25%;
+        background: var(--bg-2);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 1px 0 0 rgba(255,255,255,.2), 0 5px 14px rgba(0,0,0,.25);
+        outline: 1px solid rgba(255,255,255,.17);
+        outline-offset: -1px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .games-container .game-launch-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,.26), rgba(255,255,255,.07) 13%, transparent 31%);
+        opacity: .72;
+    }
+
+    .games-container .game-launch-card:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    .games-container .game-launch-card .bg-img { border-radius: inherit; }
+    .games-container .game-launch-card .app-title-cont { display: none; }
+
+    .mobile-game-dialog {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .mobile-game-dialog.is-open { display: flex; }
+
+    .mobile-game-dialog-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.62);
+        backdrop-filter: blur(8px);
+    }
+
+    .mobile-game-dialog-panel {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        width: min(100%, 340px);
+        padding: 24px;
+        border: 1px solid rgba(255,255,255,.2);
+        border-radius: 24px;
+        background: color-mix(in srgb, var(--bg) 86%, transparent);
+        box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18);
+        text-align: center;
+    }
+
+    .mobile-game-dialog-close {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        color: var(--text);
+        background: var(--bg-3);
+        font-size: 20px;
+    }
+
+    .mobile-game-dialog-panel > img {
+        width: 104px;
+        height: 104px;
+        border-radius: 25%;
+        object-fit: cover;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 20px rgba(0,0,0,.35);
+    }
+
+    .mobile-game-dialog-panel h2 {
+        max-width: 100%;
+        margin: 0;
+        color: var(--bright-text);
+        font-size: 20px;
+        overflow-wrap: anywhere;
+    }
+
+    .mobile-game-play {
+        width: 100%;
+        min-height: 46px;
+        border: 1px solid color-mix(in srgb, var(--accent) 65%, white 35%);
+        border-radius: 999px;
+        color: white;
+        background: var(--accent);
+        font-size: 16px;
+        font-weight: 700;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    .partners-wrapper { height: 88vh; padding: 8px; }
+    .partners-wrapper > br { display: none; }
+    .special-thanks-title { margin: 0 0 4px; font-size: 20px; }
+    .special-thanks-grid { height: calc(100% - 30px); padding: 8px; gap: 6px; }
+    .special-thanks-card { min-height: 78px; padding: 6px; gap: 4px; }
+    .special-thanks-card img { width: 38px; height: 38px; }
+    .special-thanks-tools { min-height: 52px; }
 }
 
 @media (max-width: 640px) and (orientation: landscape) {
@@ -1928,4 +2235,204 @@ span.online-count {
 .switch:has(#reduce-motion-toggle:focus-visible) .slider {
     outline: 2px solid var(--bright-text);
     outline-offset: 3px;
+}
+
+/* Shared small-screen launcher layout: compact, consistent squircle artwork for
+   both games and apps, with intrinsic grid sizing instead of the desktop cards. */
+@media (max-width: 900px) {
+    .apps-wrapper,
+    .games-wrapper {
+        box-sizing: border-box;
+        width: min(96vw, 720px);
+        height: min(82vh, 740px);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        overflow: hidden;
+        padding: 14px;
+    }
+
+    .apps-wrapper > br,
+    .games-wrapper > br { display: none; }
+
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: block;
+        flex: 0 0 auto;
+        box-sizing: border-box;
+        width: 100% !important;
+        min-height: 42px;
+        margin: 0 0 12px !important;
+        padding: 10px 14px;
+        border-radius: 14px;
+    }
+
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container {
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-content: start;
+        justify-content: stretch;
+        gap: 10px;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 3px;
+        scrollbar-width: thin;
+        overscroll-behavior: contain;
+    }
+
+    .apps-container > br,
+    .games-container > br { display: none; }
+
+    .apps-container > .app,
+    .games-container > .game-launch-card {
+        position: relative;
+        box-sizing: border-box;
+        width: 100% !important;
+        height: auto !important;
+        min-width: 0;
+        min-height: 0;
+        aspect-ratio: 1;
+        margin: 0 !important;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 25%;
+        background: var(--bg-2);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 1px 0 0 rgba(255,255,255,.2), 0 5px 14px rgba(0,0,0,.25);
+        outline: 1px solid rgba(255,255,255,.17);
+        outline-offset: -1px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .apps-container > .app::after,
+    .games-container > .game-launch-card::after {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,.24), rgba(255,255,255,.06) 14%, transparent 32%);
+    }
+
+    .apps-container > .app .bg-img,
+    .games-container > .game-launch-card .bg-img {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: inherit;
+        background-size: cover !important;
+        background-position: center;
+    }
+
+    .apps-container > .app .app-title-cont,
+    .games-container > .game-launch-card .app-title-cont { display: none !important; }
+}
+
+@media (max-width: 640px) {
+    .apps-wrapper,
+    .games-wrapper { width: 96vw; height: min(80vh, 720px); padding: 12px; }
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search { min-height: 40px; font-size: 14px; }
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container { gap: 8px; }
+}
+
+/* Shared launcher layout: use the same flex-wrapped tile row for Apps and Games.
+   Explicit sizing prevents game cards' intrinsic image dimensions from collapsing
+   row spacing or pushing the flex items out of the centered panel. */
+@media (max-width: 900px) {
+    .apps-wrapper,
+    .games-wrapper {
+        left: 50% !important;
+        right: auto !important;
+        align-items: stretch !important;
+        justify-content: flex-start;
+    }
+
+    .apps-wrapper.settings-hidden,
+    .games-wrapper.settings-hidden {
+        transform: translate(-50%, -50%) scale(.9) !important;
+    }
+
+    .apps-wrapper.settings-shown,
+    .games-wrapper.settings-shown {
+        transform: translate(-50%, -50%) scale(1) !important;
+    }
+
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search {
+        align-self: stretch !important;
+        flex-basis: auto;
+        height: 42px !important;
+        max-width: 100% !important;
+    }
+
+    .apps-wrapper > .launcher-grid,
+    .games-wrapper > .launcher-grid {
+        display: flex !important;
+        flex-flow: row wrap;
+        align-self: stretch !important;
+        align-content: flex-start;
+        justify-content: flex-start;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        margin-inline: 0 !important;
+        gap: 12px;
+    }
+
+    .launcher-grid > .app {
+        box-sizing: border-box;
+        flex: 0 0 calc((100% - 36px) / 4) !important;
+        width: calc((100% - 36px) / 4) !important;
+        height: auto !important;
+        min-width: 0;
+        min-height: 0;
+        aspect-ratio: 1;
+        margin: 0 !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .apps-wrapper > .apps-container,
+    .games-wrapper > .games-container { column-gap: 12px; row-gap: 12px; }
+
+    .apps-wrapper > .launcher-search,
+    .games-wrapper > .launcher-search { height: 40px !important; }
+
+    /* Fit the Special Thanks panel to its content rather than leaving a blank
+       lower half on phones; the list still scrolls if it grows beyond the cap. */
+    .partners-wrapper {
+        box-sizing: border-box;
+        height: auto;
+        min-height: 0;
+        max-height: 70vh;
+        padding: 12px;
+    }
+
+    .special-thanks-grid {
+        box-sizing: border-box;
+        height: auto;
+        max-height: calc(70vh - 70px);
+        align-content: start;
+        overflow-y: auto;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 640px) {
+    .partners-wrapper { height: auto; max-height: 88vh; }
+    .special-thanks-grid { height: auto; max-height: calc(88vh - 62px); }
 }

@@ -10,7 +10,7 @@
 <p>
   <a href="https://github.com/debug-cli/cherri-vercel/blob/main/LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-e2588d"></a>
   <img alt="No build step" src="https://img.shields.io/badge/build-none-brightgreen">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-125%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-134%20passing-brightgreen">
   <img alt="Proxy" src="https://img.shields.io/badge/proxy-Scramjet%20%2B%20Ultraviolet-blueviolet">
   <img alt="Transport" src="https://img.shields.io/badge/transport-libcurl.js%20%2B%20Wisp-informational">
 </p>
@@ -19,8 +19,8 @@
   <b>Deploy in one click</b><br>
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Vercel" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/vercel.svg" height="40"></a>
   <a href="https://app.netlify.com/start/deploy?repository=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Netlify" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/netlify.svg" height="40"></a>
-  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create"><img alt="Deploy to Cloudflare Pages" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/cloudflarepages.svg" height="40"></a>
-  <a href="https://github.com/debug-cli/cherri-vercel/fork"><img alt="Deploy to GitHub Pages" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/github.svg" height="40"></a>
+  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create"><img alt="Deploy to Cloudflare Pages" src="https://img.shields.io/badge/Deploy_to-Cloudflare_Pages-F38020?logo=cloudflare&logoColor=white&style=for-the-badge" height="40"></a>
+  <a href="https://github.com/debug-cli/cherri-vercel/fork"><img alt="Deploy to GitHub Pages" src="https://img.shields.io/badge/Deploy_to-GitHub_Pages-24292f?logo=githubpages&logoColor=white&style=for-the-badge" height="40"></a>
   <a href="https://render.com/deploy?repo=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy to Render" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/render.svg" height="40"></a>
   <a href="https://railway.app/new/template?template=https://github.com/debug-cli/cherri-vercel"><img alt="Deploy on Railway" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/railway.svg" height="40"></a>
   <a href="https://replit.com/github/debug-cli/cherri-vercel"><img alt="Run on Replit" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/replit.svg" height="40"></a>
@@ -88,7 +88,7 @@ third domain for each. This one is meant to be the only tab you need:
   strips query strings before it stores anything). Preferences live in your own browser and can be
   saved to a file and restored on another machine — useful on school machines that wipe profiles, and
   useful for setting up a friend.
-- **It is maintained like software.** There are 125 automated tests, a documented engineering
+- **It is maintained like software.** There are 134 automated tests, a documented engineering
   handbook (`AGENTS.md`), a changelog of what the fork fixed, and a licence that keeps it open
   (AGPL-3.0). That is why a bug you report
   can actually be fixed, which is not true of a site whose repository is a screenshot and a Discord
@@ -246,7 +246,7 @@ in the parts that decide whether it *works* when you need it:
 | **Offline / filtered network** | Blank page, no way into Settings | Cached app shell still boots |
 | **Deployment** | Sometimes needs a Node build, a server, or a specific host | Pure static files; deploys to Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, or `python3 -m http.server` |
 | **Mobile** | Desktop-only chrome | Purpose-built small-screen layout (bottom nav, stacked tabs, full-width frames) |
-| **Tests** | Usually none | `node --test tests/*.test.js`, 125 dependency-free tests covering the proxy, Wisp handling, panic and its return path, logging, sessions, settings backup, PWA shell and site wiring |
+| **Tests** | Usually none | `node --test tests/*.test.js`, 134 dependency-free tests covering the proxy, Wisp handling, panic and its return path, logging, sessions, settings backup, PWA shell and site wiring |
 
 What it is **not**: it is not a VPN, it does not host a proxy server, it does not bypass a network
 that blocks WebSockets entirely, and it cannot make a dead Wisp endpoint work.
@@ -421,7 +421,7 @@ There is no build step and no package manifest.
 
 ```sh
 python3 -m http.server 8080     # serve the repo root
-node --test tests/*.test.js     # 125 tests, no dependencies, no network
+node --test tests/*.test.js     # 134 tests, no dependencies, no network
 ```
 
 Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md).
@@ -432,9 +432,37 @@ Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md)
 
 ### v2.0.0 "juice"
 
-- Panic return restores the same page, browser tabs, drawer and settings panel.
-- Added the exportable debug log (verbose logging is on by default).
-- Released the midnight-themed graip fork with refreshed settings and release notes.
+A major reliability and usability release, delivered across [PR #1](https://github.com/debug-cli/graip/pull/1),
+[PR #2](https://github.com/debug-cli/graip/pull/2), [PR #3](https://github.com/debug-cli/graip/pull/3)
+and the continuing UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4).
+
+- **More reliable proxying:** probe and fail over between Wisp routes, bound retries so dead routes fail
+  promptly, and show useful proxy error pages. TLS certificate checks remain enabled; certificate
+  errors are explained rather than hidden by weakening verification.
+- **Panic key and cloaking:** configure a panic key, destination and decoy appearance; nine cloak
+  profiles can change the tab title, icon and apparent page. Escape or the configured key returns to
+  the exact page, browser tabs, open drawer and Settings panel you left.
+- **Settings backup:** export preferences to a JSON file and restore them with per-setting validation;
+  unknown or unsafe values are skipped without blocking valid settings.
+- **Debugging and privacy:** an exportable, bounded debug log records useful actions and warnings while
+  redacting query strings and sensitive destinations. The Debug panel can export JSON or plain text.
+- **Browser and sessions:** tab history survives reloads, and the address bar accepts URLs, searches
+  and shortcuts. Wisp failures are surfaced instead of leaving a tab silently stuck.
+- **Mobile and accessibility:** add an installable PWA shell, responsive small-screen layouts,
+  scrollable Settings categories, reduced-motion controls, and clearer recovery from dead integrations.
+- **Stability and maintenance:** repair broken page links and settings wiring, handle missing browser
+  APIs without aborting the rest of the page, add library thumbnail fallbacks and health checks, and
+  document the project for both users and contributors. The release keeps the midnight theme and
+  the existing v2.0.0 “juice” version stamp.
+- **Desktop and mobile UI polish (PR #4):** align the Apps and Games launcher tiles using one shared
+  responsive grid, preserve the desktop game launch flow while showing game details before launch on
+  phones, improve the mobile Movies and Special Thanks layouts, and keep mobile-only overrides scoped
+  so desktop styling is not inadvertently changed. The mobile shell uses a bottom navigation bar;
+  feature pages retain their responsive layouts inside the shell.
+- **Motion and navigation:** start the default-on fog effect as soon as the document is ready instead
+  of waiting for slower page subresources (including on a first visit with no saved preference),
+  synchronize fog with Reduced Motion, and remove Discord
+  navigation entries from the shell's first-party page menus on desktop and mobile.
 
 ## Credits
 
@@ -481,7 +509,7 @@ original code was written by x8r. Changes made in this fork:
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader;
   shared scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`
 - Library hygiene: missing thumbnails get a placeholder and are reported
-- Added `tests/` (125 tests) and `AGENTS.md`
+- Added `tests/` (134 tests) and `AGENTS.md`
 
 Upstream: <https://github.com/x8rr/cherri>
 
