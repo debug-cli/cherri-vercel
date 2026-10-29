@@ -26,6 +26,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
 | Chasing a bug | §20 debugging cookbook, §22 traps, §23 sweep findings |
 | Adding a feature | §21 conventions, §24 playbooks, then the relevant subsystem |
 | Changing shell or page UI, dropdowns, or switches | §27 UI architecture and contribution patterns |
+| Updating README badges or their metadata | §28 README badge conventions |
 | Reviewing a PR | §25 invariants checklist |
 
 **Hard rules that no section overrides** — if you only remember four things:
@@ -35,7 +36,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
    are vendored. Read them, never reformat them, never "clean them up", keep diffs mechanical.
 3. Every DOM/global lookup in a shared script must tolerate absence. A page that does not use a
    feature still loads the file.
-4. `node --test tests/*.test.js` stays green (134 tests). Nothing else is required to verify a change,
+4. `node --test tests/*.test.js` stays green (136 tests). Nothing else is required to verify a change,
    and nothing else may be added to the repo to verify one.
 
 ---
@@ -139,7 +140,7 @@ second).
 │                                        `index.mjs`/`index.js`/`index.cjs` + `libcurl.mjs`
 ├── fa/                       409 files  Font Awesome Free 7.1.0
 ├── stores/                  7026 files  vendored games: ucp-games (6402) + gn-math (624)
-└── tests/                     13 files  134 dependency-free tests
+└── tests/                     13 files  136 dependency-free tests
 ```
 
 Totals: **8,401 tracked files, ~2.7 GB**. Roughly 120 of them are first-party.
@@ -290,7 +291,7 @@ message in the page, not hang — `chatrooms.html` and `assistant.html` show the
 
 ```
 every page:      log.js  →  cloak.js  →  (page-specific)
-index.html:      wisp.js → colors.js → splash.js → debug-panel.js → proxy-errors.js
+index.html:      wisp.js → colors.js → assets/splashes/splash.js → debug-panel.js → proxy-errors.js
                  → browserfunctions.js → particles → dropdown.js → settings-io.js
 browser pages:   baremux/index.js → math.all.js → wisp.js → t.js → english.bundle.js
                  → proxy-errors.js → browserfunctions.js
@@ -546,13 +547,37 @@ picker and shows `chosen → fallback` while a failover is live.
 | `colors.js` | 12 | Applies `graip_theme` to `#css-theme-link` before paint; must tolerate a missing link (`404.html` regressed this once) |
 | `t.js` | 146 | `showToast(type, message, icon)`; creates `.toast-container` if absent, pauses timers on hover, stacks toasts |
 | `cursor.js` | 115 | ZXS cursor; `cursor()` starts it, disabling removes `#cursor-style-zxs`/`#cursor-thank-you-zxs` and all listeners |
-| `splash.js` | 88 | `splashes[]` array of hero strings; the shell picks one at random |
+| `assets/splashes/splash.js` | — | Fetches a UTF-8 line-based phrase list, picks one at random, and safely renders optional Markdown links |
+| `assets/splashes/splashes.txt` | 80 lines | Editable splash phrases, one per line; this is the copy source of truth |
 | `vm.js` | 118 | Legacy Hyperbeam launcher with `graip_vm_cooldown` (20 min); every lookup optional, no-ops on today's pages |
 | `chatrooms.js` | 129 | CometChat client (`api.x8r.dev` token). **Not loaded anywhere**; `chatrooms.html` uses socket.io. Dead code |
 | `lib/particles.js` | 963 | Vendored particles.js |
 | `lib/three.min.js` | 26,887 | Vendored three.js (Vanta dependency, `index.html` only) |
 | `lib/vanta.fog.min.js` | 440 | Vendored Vanta fog |
 | `lib/detectmobile.js` | 35 | `isMobile()` UA sniff; used only by vendored GN-Math pages |
+
+### 5.10 Updating splash phrases
+
+The splash copy is maintained in [`assets/splashes/splashes.txt`](assets/splashes/splashes.txt), next
+to its loader, [`assets/splashes/splash.js`](assets/splashes/splash.js). To change the rotating
+homepage phrases, edit the `.txt` file directly in any plain-text editor:
+
+1. Put exactly one splash on each line. The file is UTF-8; blank lines are ignored and surrounding
+   whitespace is trimmed. Do not add JSON quotes, commas, or array brackets.
+2. Use ordinary text by default. A clickable link can use the form
+   `[visible label](https://example.com)`; only HTTPS links are rendered as links, and they open in a
+   new tab with `noopener noreferrer`. Do not add raw HTML: the loader renders all other content as
+   text, so tags cannot execute or alter the page.
+3. Save the file, check that the new line appears once, then run
+   `node --test tests/*.test.js` and `git diff --check`. No JavaScript edit is needed for copy-only
+   changes.
+4. Keep both files together in `assets/splashes/`, update the shell script path in `index.html` if
+   the loader ever moves, and keep both assets in `sw.js` → `SHELL_ASSETS` so the splash works offline.
+   Bump `SHELL_CACHE` when changing the shell asset list or service-worker behavior, not merely to
+   change a phrase in the text file.
+
+Change `assets/splashes/splash.js` only when changing phrase-loading or rendering behavior. If doing
+so, retain the plain-text-by-default rendering and the HTTPS-only Markdown link behavior.
 
 ---
 
@@ -1038,7 +1063,7 @@ IntersectionObserver), never `<img>` in the grid.
 ## 15. Testing
 
 ```bash
-node --test tests/*.test.js        # 134 tests, ~5 s, no dependencies, no network
+node --test tests/*.test.js        # 136 tests, ~5 s, no dependencies, no network
 ```
 
 | File | Tests | Behaviour it pins |
@@ -1313,7 +1338,7 @@ asserts the key.
 
 ## 25. Review checklist
 
-- [ ] `node --test tests/*.test.js` → 134/134, and a test exists for the new behaviour
+- [ ] `node --test tests/*.test.js` → 136/136, and a test exists for the new behaviour
 - [ ] No new dependency, build step, or vendored file
 - [ ] Every new DOM lookup is guarded; every new page is loadable standalone
 - [ ] No site URL, token or query string reaches the log
@@ -1339,7 +1364,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
 - Panic return point: the decoy reopens graip at the exact URL, page, drawer and settings panel the
   user left, instead of falling through to `/start.html` via `history.back()`.
 - Release stamp `v2.0.0 "juice"`: `<graipattr version>` in `index.html` (drives the update toast),
-  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v6`).
+  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v7`).
 - Exportable debug log (verbose on by default) and Debug/Backup settings panels.
 - Tab sessions restored after reload; omnibox shortcuts and bangs.
 - Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.
@@ -1348,7 +1373,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader; shared
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
-- Added `tests/` (134 tests) and this handbook.
+- Added `tests/` and this handbook (the suite now has 136 tests).
 
 ---
 
@@ -1458,6 +1483,36 @@ destinations. Provide a disabled-state explanation if a parent preference makes 
 
 ---
 
+## 28. README badge conventions
+
+The badge block at the top of `README.md` is manually maintained. Use ShieldCN for badge images and
+keep the existing theme-aware `<picture>` pattern: the `<source>` selects the dark-mode URL and the
+`<img>` is the light-mode fallback. In HTML attributes, encode query separators as `&amp;`. Keep
+meaningful `alt` text and wrap live repository metrics in links to the matching GitHub page.
+
+When adding or updating badges:
+
+- Use the canonical repository path `debug-cli/graip` for live GitHub metrics. Do not copy the example
+  source in an attached badge template (it may refer to another repository) or use the old
+  `debug-cli/cherri-vercel` path for repository statistics.
+- Only include badges for facts that are true of this repo. The currently relevant static facts are
+  no build step, the current passing test count, the Scramjet/Ultraviolet proxy, libcurl.js/Wisp
+  transport, Vercel hosting, Tailwind CDN usage, and the presence of this agent guide. Do not add
+  sample badges for Next.js, React, TypeScript, package managers, or tools this repo does not use.
+- Keep the static Tests badge in sync with the real `node --test tests/*.test.js` result; it currently
+  reports **136 passing**. Run the full suite before changing that number.
+- There is no tracked GitHub Actions workflow in this repository today. Do not add a CI-status badge
+  that implies a workflow exists; reassess if the repository gains CI later.
+- Replace any `shields.io` image badges with the corresponding ShieldCN image rather than mixing badge
+  providers. Keep deploy buttons from other providers as distinct links, unless replacing a
+  Shields.io-derived badge itself.
+
+After changing the README badge markup, run `node --test tests/*.test.js` and
+`git diff --check`. `tests/site-wiring.test.js` checks that the README uses this repository's ShieldCN
+metrics and has no remaining Shields.io image URLs.
+
+---
+
 ## Verifying this document
 
 Everything above is checkable from a clone:
@@ -1467,7 +1522,7 @@ wc -l index.html panic.html sw.js assets/js/*.js styles/index.css   # line count
 ls assets/css/themes | wc -l                                       # 16 themes
 ls assets/json && node -e 'for (const f of ["classplay","gn-math","apps","partners"])
   console.log(f, JSON.parse(require("fs").readFileSync(`assets/json/${f}.json`)).length)'
-node --test tests/*.test.js | tail -3                              # 134 pass
+node --test tests/*.test.js | tail -3                              # 136 pass
 git ls-files | wc -l                                               # 8400
 ```
 
