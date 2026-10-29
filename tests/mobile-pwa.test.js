@@ -364,7 +364,8 @@ test("theme changes rebuild enabled Vanta fog from the active palette", () => {
   assert.match(html, /document\.addEventListener\("themeUpdated"/);
   assert.match(html, /highlightColor: hexToNumber\(cssVar\("--accent"\)\)/);
   assert.match(html, /midtoneColor: hexToNumber\(cssVar\("--bg-2"\)\)/);
-  assert.match(html, /const startFogAfterLayout = \(\) =>[\s\S]*?window\.graipStartFog\(\)[\s\S]*?document\.readyState === "complete"/);
+  assert.match(html, /const startFogAfterLayout = \(\) =>[\s\S]*?window\.graipStartFog\(\)[\s\S]*?document\.readyState === "loading"[\s\S]*?document\.addEventListener\("DOMContentLoaded", startFogAfterLayout/);
+  assert.doesNotMatch(html, /window\.addEventListener\("load", startFogAfterLayout/);
   assert.match(dropdown, /theme: localStorage\.getItem\("graip_theme"\) \|\| "midnight"/);
   assert.match(dropdown, /Theme and fog colors updated/);
 });
@@ -401,6 +402,9 @@ test("mobile apps share the compact squircle launcher grid and Discord is remove
   const shell = read("index.html");
   const css = read("styles/index.css");
   assert.doesNotMatch(shell, /ri-discord-fill|discord\.gg/);
+  for (const page of ["pages/apps.html", "pages/games.html", "pages/movieframe.html", "pages/partners.html"]) {
+    assert.doesNotMatch(read(page), /ri-discord-fill|discord\.gg/);
+  }
   assert.match(css, /\.apps-wrapper > \.apps-container,[\s\S]*?grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.apps-container > \.app,[\s\S]*?aspect-ratio:\s*1/);
   assert.match(css, /\.apps-container > \.app::after/);

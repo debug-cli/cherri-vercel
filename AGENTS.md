@@ -25,6 +25,7 @@ and the counts are reproducible with the commands in [Verifying this document](#
 | Touching cloaking, panic or tabs | §12 cloaking, §5.5 tab engine |
 | Chasing a bug | §20 debugging cookbook, §22 traps, §23 sweep findings |
 | Adding a feature | §21 conventions, §24 playbooks, then the relevant subsystem |
+| Changing shell or page UI, dropdowns, or switches | §27 UI architecture and contribution patterns |
 | Reviewing a PR | §25 invariants checklist |
 
 **Hard rules that no section overrides** — if you only remember four things:
@@ -1338,7 +1339,7 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
 - Panic return point: the decoy reopens graip at the exact URL, page, drawer and settings panel the
   user left, instead of falling through to `/start.html` via `history.back()`.
 - Release stamp `v2.0.0 "juice"`: `<graipattr version>` in `index.html` (drives the update toast),
-  the settings footer, the Updates panel and `SHELL_CACHE = graip-shell-v2`.
+  the settings footer, the Updates panel and the versioned shell cache (currently `graip-shell-v6`).
 - Exportable debug log (verbose on by default) and Debug/Backup settings panels.
 - Tab sessions restored after reload; omnibox shortcuts and bangs.
 - Mobile layout (desktop unchanged); PWA manifest + offline shell cache; `vercel.json` headers.
@@ -1348,6 +1349,107 @@ Kept for context; the authoritative list is `README.md` → FORK NOTICE.
   scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`; visitor counter
   threw on load; `VANTA.FOG()` aborted its script block; `404.html` pointed at a missing page.
 - Added `tests/` (134 tests) and this handbook.
+
+---
+
+## 27. UI architecture and contribution patterns
+
+This section is the practical map for visual changes. Keep the HTML-first, static-site model: there is
+no app bundler or component framework. The shell is assembled in `index.html` (markup plus inline
+scripts), styled primarily by `styles/index.css`, and enhanced by shared scripts in `assets/js/`.
+Feature pages are separate HTML documents under `pages/`, usually shown in the shell's
+`#contentFrame`; some can also be opened directly. `assets/css/elements.css` provides shared styles
+for those pages, while feature-specific styles may live in the page or a dedicated stylesheet. A few
+legacy pages use utility classes from the Tailwind CDN; that is a dependency of those pages, not the
+preferred way to build new UI. Use existing CSS and theme tokens instead of adding a library.
+
+### 27.1 Desktop and mobile are intentionally different
+
+The mobile UI is not simply a shrunken desktop layout. Preserve established interaction differences
+and keep phone-only corrections inside the mobile media queries described in §13.2. Do not move a
+mobile fix to a top-level rule to make it easier to write; that can change desktop.
+
+| Area | Desktop | Mobile / narrow viewport |
+| --- | --- | --- |
+| Shell navigation | Compact navigation sits at the top of the shell. | Navigation becomes the fixed bottom bar; keep page content and controls clear of it and of device safe areas. |
+| Settings | A centered settings sheet with a side category list and a content pane. | Categories and settings content stack/scroll in the available viewport; controls must remain reachable without horizontal overflow. |
+| Apps and Games | Launcher panels use the shared tile system and keep the established desktop activation behavior. | Search and tiles fit the viewport; the shared `.launcher-grid` keeps a consistent four-across tile layout where space permits. Games show the mobile details dialog before the Play action. |
+| Movies | The feature page uses its desktop card grid and controls. | Cards reflow to fewer columns and controls remain touch-sized; preserve the current Movies composition when editing other pages. |
+| Special Thanks | Cards use the desktop panel and grid dimensions. | The panel grows with its contents and the cards use the compact phone layout rather than being clipped. |
+| Feature pages in the shell | Page documents render in the content iframe and retain their feature-specific desktop layout. | The same page documents use responsive rules (often from `assets/css/mobile.css`); test the page in the shell as well as standalone if its navigation or sizing depends on the shell. |
+
+This table records interaction and layout contracts, not pixel-perfect dimensions. Before changing a
+feature, inspect its current markup and the matching selectors in `styles/index.css`,
+`assets/css/elements.css`, `assets/css/mobile.css`, or its own page. The approved Apps/Games and Movies
+layouts are regression-sensitive; make the smallest local change and compare both viewport classes.
+
+### 27.2 Where to make a visual change
+
+1. **Shell structure or shell behavior:** edit the relevant markup in `index.html`; shared settings,
+   dropdown, logging, and navigation helpers are in `assets/js/`. Keep shell-only styling in
+   `styles/index.css`.
+2. **A standalone/iframe feature:** edit its `pages/<feature>.html` and feature stylesheet, if any.
+   Shared page chrome belongs in `assets/css/elements.css`; shared phone overrides belong in
+   `assets/css/mobile.css` (max-width 644 px). Do not assume a page's CSS is inherited from the shell:
+   the iframe has its own document and stylesheet cascade.
+3. **Theme-sensitive colors:** use the variables from §13.1 (`--bg*`, `--border*`, `--text`,
+   `--bright-text`, `--accent`, `--accent-2`) rather than hard-coded palette colors. Theme selection
+   swaps the root theme stylesheet, so hard-coded colors will not adapt.
+4. **Icons:** reuse the icon libraries already loaded by the page and provide accessible text/labels
+   for icon-only controls. Do not add or edit vendored assets just to change markup.
+5. **Responsive behavior:** add narrow-viewport rules inside the existing media query. Keep the
+   unqualified/base rule responsible for desktop, and add the corresponding mobile override only when
+   needed. Prefer `min-width: 0`, wrapping, and bounded widths over viewport-wide overflow.
+
+### 27.3 Dropdown / selector pattern
+
+The Settings selectors are built from a wrapper, a selected-value element, and an initially empty
+options container. Their classes follow the selector contract in §13.3 (for example,
+`.theme-selector`, `.theme-selected`, `.theme-options`). `assets/js/dropdown.js`'s `createSelector()`
+creates option elements with `textContent`, closes other selectors, stores the chosen value, and emits
+the configured custom event. When adding a selector:
+
+- Reuse this pattern and the shared `closeAllSelectors()` behavior rather than adding a second,
+  incompatible dropdown implementation.
+- Add the wrapper/selected/options markup in the appropriate Settings page, with a unique selector
+  type and storage key; wire its initialization alongside the existing `createSelector()` calls.
+- Enumerate allowed values in code. Normalize values only where the existing storage contract
+  requires it, and listen for the event where dependent UI must refresh.
+- Match the selector's open/closed CSS states in `assets/css/dropdown.css` or the shell stylesheet as
+  appropriate. Keep the options usable on touch screens and within the viewport.
+- Include button-like keyboard operation, focus visibility, and `aria-expanded` / `aria-controls` (or
+  an equivalent accessible pattern) when introducing a new selector; do not copy missing accessibility
+  behavior just because a legacy selector lacks it. Use DOM APIs and `textContent` for option labels,
+  never HTML interpolation for values.
+- Log a settings change through `GraipLog.action("settings", ...)` without logging typed content,
+  destinations, or other private values. Add/update the relevant test for persistence and emitted events.
+
+### 27.4 Switch / checkbox pattern
+
+Use a native checkbox inside the existing `.switch` label and the existing `.slider` / `.circle`
+structure. Give it a stable, unique `id`, a visible nearby heading and explanation, and a real label
+(or an `aria-label` when the design cannot show one). Native checkbox semantics preserve keyboard
+and assistive-technology support; do not replace the input with a clickable `div`.
+
+For a new persistent switch, initialize its checked state from its documented storage key during page
+startup and have one named change handler own persistence and side effects. Follow existing Settings
+conventions: validate dependencies (for example, Reduced Motion can disable motion features), keep the
+control state synchronized when a parent setting changes, dispatch an event if another subsystem needs
+to react, and record the setting action with `GraipLog`. Never log keystrokes, entered text, or link
+destinations. Provide a disabled-state explanation if a parent preference makes the switch unavailable.
+
+### 27.5 UI change checklist
+
+- Identify whether the element belongs to the shell or to an iframe page; update the correct document
+  and stylesheet.
+- Preserve desktop behavior when a request is mobile-only; scope mobile overrides as §13.2 requires.
+- Check the phone layout around the bottom navigation, settings sheet, and safe areas; check desktop
+  at a wide viewport too. Test keyboard focus and reduced-motion behavior for interactive controls.
+- For dropdowns/switches, verify initial saved state, change handling, persistence, logging privacy,
+  and any dependent event or visual state.
+- Add regression tests to `tests/`, run `node --test tests/*.test.js`, and run `git diff --check`.
+  A passing source test is not a substitute for visually verifying the deployed preview when the fix
+  concerns appearance or rendering.
 
 ---
 

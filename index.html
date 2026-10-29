@@ -1848,8 +1848,13 @@ window.graipStartFog && window.graipStartFog()
                 requestAnimationFrame(() => requestAnimationFrame(() => window.graipStartFog()))
             }
         }
-        if (document.readyState === "complete") startFogAfterLayout()
-        else window.addEventListener("load", startFogAfterLayout, { once: true })
+        // Start at DOM readiness rather than waiting for every subresource: mobile
+        // networks can keep `load` pending even though the shell can already paint.
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", startFogAfterLayout, { once: true })
+        } else {
+            startFogAfterLayout()
+        }
 
         document.addEventListener("themeUpdated", () => {
             const link = document.getElementById("css-theme-link")

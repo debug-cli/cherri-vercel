@@ -433,7 +433,8 @@ Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md)
 ### v2.0.0 "juice"
 
 A major reliability and usability release, delivered across [PR #1](https://github.com/debug-cli/graip/pull/1),
-[PR #2](https://github.com/debug-cli/graip/pull/2) and [PR #3](https://github.com/debug-cli/graip/pull/3).
+[PR #2](https://github.com/debug-cli/graip/pull/2), [PR #3](https://github.com/debug-cli/graip/pull/3)
+and the continuing UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4).
 
 - **More reliable proxying:** probe and fail over between Wisp routes, bound retries so dead routes fail
   promptly, and show useful proxy error pages. TLS certificate checks remain enabled; certificate
@@ -453,6 +454,14 @@ A major reliability and usability release, delivered across [PR #1](https://gith
   APIs without aborting the rest of the page, add library thumbnail fallbacks and health checks, and
   document the project for both users and contributors. The release keeps the midnight theme and
   the existing v2.0.0 “juice” version stamp.
+- **Desktop and mobile UI polish (PR #4):** align the Apps and Games launcher tiles using one shared
+  responsive grid, preserve the desktop game launch flow while showing game details before launch on
+  phones, improve the mobile Movies and Special Thanks layouts, and keep mobile-only overrides scoped
+  so desktop styling is not inadvertently changed. The mobile shell uses a bottom navigation bar;
+  feature pages retain their responsive layouts inside the shell.
+- **Motion and navigation:** start the saved fog effect as soon as the document is ready instead of
+  waiting for slower page subresources, synchronize fog with Reduced Motion, and remove Discord
+  navigation entries from the shell's first-party page menus on desktop and mobile.
 
 ## Credits
 
