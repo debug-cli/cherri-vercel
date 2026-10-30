@@ -294,8 +294,9 @@ test("special thanks lists the README credits and settings categories can scroll
   const css = read("styles/index.css");
   const thanks = html.slice(html.indexOf('class="partners-wrapper'), html.indexOf('<button id="reset-theme"'));
   assert.match(thanks, /Special Thanks/);
-  for (const name of ["x8r · Cherri", "MercuryWorkshop", "ading2210", "Titanium Network", "waves.lat", "binbashbanana"])
+  for (const name of ["x8r · Cherri", "debug-cli", "MercuryWorkshop", "ading2210", "Titanium Network", "waves.lat", "binbashbanana"])
     assert.ok(thanks.includes(name), `missing credit ${name}`);
+  assert.match(thanks, /href="https:\/\/github\.com\/debug-cli"[^>]*><img src="https:\/\/github\.com\/debug-cli\.png\?size=160"/);
   assert.doesNotMatch(thanks, /Prism|Hydra Network/);
   assert.match(html, /class="settings-sidebar vflex"[^>]*aria-label="Settings categories"/);
   assert.match(css, /\.settings-sidebar\s*\{[^}]*overflow-y:\s*auto/s);
