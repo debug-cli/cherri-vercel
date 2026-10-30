@@ -114,7 +114,7 @@ third domain for each. This one is meant to be the only tab you need:
   strips query strings before it stores anything). Preferences live in your own browser and can be
   saved to a file and restored on another machine — useful on school machines that wipe profiles, and
   useful for setting up a friend.
-- **It is maintained like software.** There are 134 automated tests, a documented engineering
+- **It is maintained like software.** There are 137 automated tests, a documented engineering
   handbook (`AGENTS.md`), a changelog of what the fork fixed, and a licence that keeps it open
   (AGPL-3.0). That is why a bug you report
   can actually be fixed, which is not true of a site whose repository is a screenshot and a Discord
@@ -272,7 +272,7 @@ in the parts that decide whether it *works* when you need it:
 | **Offline / filtered network** | Blank page, no way into Settings | Cached app shell still boots |
 | **Deployment** | Sometimes needs a Node build, a server, or a specific host | Pure static files; deploys to Vercel, Netlify, Cloudflare Pages, GitHub Pages, Render, Railway, or `python3 -m http.server` |
 | **Mobile** | Desktop-only chrome | Purpose-built small-screen layout (bottom nav, stacked tabs, full-width frames) |
-| **Tests** | Usually none | `node --test tests/*.test.js`, 134 dependency-free tests covering the proxy, Wisp handling, panic and its return path, logging, sessions, settings backup, PWA shell and site wiring |
+| **Tests** | Usually none | `node --test tests/*.test.js`, 137 dependency-free tests covering the proxy, Wisp handling, panic and its return path, logging, sessions, settings backup, PWA shell and site wiring |
 
 What it is **not**: it is not a VPN, it does not host a proxy server, it does not bypass a network
 that blocks WebSockets entirely, and it cannot make a dead Wisp endpoint work.
@@ -447,7 +447,7 @@ There is no build step and no package manifest.
 
 ```sh
 python3 -m http.server 8080     # serve the repo root
-node --test tests/*.test.js     # 134 tests, no dependencies, no network
+node --test tests/*.test.js     # 137 tests, no dependencies, no network
 ```
 
 Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md).
@@ -460,8 +460,10 @@ Guidelines, architecture notes and known traps are in [`AGENTS.md`](./AGENTS.md)
 
 A major reliability and usability release, delivered across [PR #1](https://github.com/debug-cli/graip/pull/1),
 [PR #2](https://github.com/debug-cli/graip/pull/2), [PR #3](https://github.com/debug-cli/graip/pull/3),
-the UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4), and the splash and
-repository-documentation updates in [PR #5](https://github.com/debug-cli/graip/pull/5).
+the UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4), splash and badge updates in
+[PR #5](https://github.com/debug-cli/graip/pull/5), the README hero refresh in
+[PR #6](https://github.com/debug-cli/graip/pull/6), and the creator credit in
+[PR #7](https://github.com/debug-cli/graip/pull/7).
 
 - **More reliable proxying:** probe and fail over between Wisp routes, bound retries so dead routes fail
   promptly, and show useful proxy error pages. TLS certificate checks remain enabled; certificate
@@ -496,6 +498,11 @@ repository-documentation updates in [PR #5](https://github.com/debug-cli/graip/p
 - **README badges (PR #5):** replace the Shields.io images with theme-aware ShieldCN badges for
   relevant GitHub repository metrics, project facts, and deploy options. Keep the displayed test
   count current and omit stack or CI badges that do not describe this repository.
+- **README presentation (PR #6):** add a restrained homepage screenshot, replace the static title
+  with a slowly repeating purple JetBrains Mono typing animation, and link the Changelog from the
+  README table of contents.
+- **Creator credit (PR #7):** add the `debug-cli` GitHub profile and avatar to the responsive Special
+  Thanks menu so the credit is present on desktop and mobile.
 
 ## Credits
 
@@ -542,7 +549,7 @@ original code was written by x8r. Changes made in this fork:
   links pointed at a nonexistent page; movies called `api.tmdb.org`; chat hung on its loader;
   shared scripts threw on pages without their markup; `sw.js` never called `skipWaiting()`
 - Library hygiene: missing thumbnails get a placeholder and are reported
-- Added `tests/` (134 tests) and `AGENTS.md`
+- Added `tests/` (137 tests) and `AGENTS.md`
 
 Upstream: <https://github.com/x8rr/cherri>
 
