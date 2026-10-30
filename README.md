@@ -462,7 +462,7 @@ A major reliability and usability release, delivered across [PR #1](https://gith
 [PR #2](https://github.com/debug-cli/graip/pull/2), [PR #3](https://github.com/debug-cli/graip/pull/3),
 the UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4), splash and badge updates in
 [PR #5](https://github.com/debug-cli/graip/pull/5), the README hero refresh in
-[PR #6](https://github.com/debug-cli/graip/pull/6), and the creator credit in
+[PR #6](https://github.com/debug-cli/graip/pull/6), and the creator/profile updates in
 [PR #7](https://github.com/debug-cli/graip/pull/7).
 
 - **More reliable proxying:** probe and fail over between Wisp routes, bound retries so dead routes fail
@@ -501,8 +501,9 @@ the UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4), s
 - **README presentation (PR #6):** add a restrained homepage screenshot, replace the static title
   with a slowly repeating purple JetBrains Mono typing animation, and link the Changelog from the
   README table of contents.
-- **Creator credit (PR #7):** add the `debug-cli` GitHub profile and avatar to the responsive Special
-  Thanks menu so the credit is present on desktop and mobile.
+- **Creator credit and hero label (PR #7):** add the `debug-cli` GitHub profile and avatar to the
+  responsive Special Thanks menu, and update the repeating title to show `debug-cli` with `(saint)`
+  beneath it.
 
 ## Credits
 
