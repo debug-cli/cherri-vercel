@@ -94,9 +94,8 @@ test("README badges use shieldcn for this repo and contain no shields.io images"
 test("README renders a compact homepage screenshot, animated title, and changelog link", () => {
   const source = read("README.md");
 
-  assert.ok(source.includes("readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=48&amp;duration=5000&amp;pause=1800&amp;repeat=true"));
-  assert.ok(source.includes("&amp;multiline=true&amp;width=500&amp;height=125&amp;lines=debug-cli;%28saint%29&amp;color=A78BFA"));
-  assert.ok(source.includes('alt="debug-cli (saint)"'));
+  assert.ok(source.includes("readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=52&amp;duration=5000&amp;pause=1800&amp;repeat=true&amp;center=true&amp;vCenter=true&amp;width=500&amp;height=90&amp;lines=graip&amp;color=A78BFA"));
+  assert.ok(source.includes('alt="graip"'));
   assert.ok(source.includes('<img src="assets/img/readme-homepage.png" width="780" alt="graip homepage screenshot">'));
   assert.ok(fs.existsSync(path.join(ROOT, "assets/img/readme-homepage.png")));
   assert.ok(source.includes('href="#changelog">Changelog</a>'));
@@ -298,6 +297,7 @@ test("special thanks lists the README credits and settings categories can scroll
   for (const name of ["x8r · Cherri", "debug-cli", "MercuryWorkshop", "ading2210", "Titanium Network", "waves.lat", "binbashbanana"])
     assert.ok(thanks.includes(name), `missing credit ${name}`);
   assert.match(thanks, /href="https:\/\/github\.com\/debug-cli"[^>]*><img src="https:\/\/github\.com\/debug-cli\.png\?size=160"/);
+  assert.ok(thanks.includes("<span>debug-cli<br>(saint)</span>"), "the saint label sits under the debug-cli profile card");
   assert.doesNotMatch(thanks, /Prism|Hydra Network/);
   assert.match(html, /class="settings-sidebar vflex"[^>]*aria-label="Settings categories"/);
   assert.match(css, /\.settings-sidebar\s*\{[^}]*overflow-y:\s*auto/s);
