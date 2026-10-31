@@ -1,7 +1,7 @@
 <div align="center">
 
 <h1>
-  <a href="https://github.com/debug-cli/graip"><img alt="debug-cli (saint)" src="https://readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=48&amp;duration=5000&amp;pause=1800&amp;repeat=true&amp;center=true&amp;vCenter=true&amp;multiline=true&amp;width=500&amp;height=125&amp;lines=debug-cli;%28saint%29&amp;color=A78BFA"></a>
+  <a href="https://github.com/debug-cli/graip"><img alt="graip" src="https://readme-typing-svg.herokuapp.com/?font=JetBrains+Mono&amp;size=52&amp;duration=5000&amp;pause=1800&amp;repeat=true&amp;center=true&amp;vCenter=true&amp;width=500&amp;height=90&amp;lines=graip&amp;color=A78BFA"></a>
 </h1>
 
 <p>
@@ -501,9 +501,8 @@ the UI and mobile fixes in [PR #4](https://github.com/debug-cli/graip/pull/4), s
 - **README presentation (PR #6):** add a restrained homepage screenshot, replace the static title
   with a slowly repeating purple JetBrains Mono typing animation, and link the Changelog from the
   README table of contents.
-- **Creator credit and hero label (PR #7):** add the `debug-cli` GitHub profile and avatar to the
-  responsive Special Thanks menu, and update the repeating title to show `debug-cli` with `(saint)`
-  beneath it.
+- **Creator credit (PR #7):** add the `debug-cli` GitHub profile and avatar to the responsive Special
+  Thanks menu so the credit is present on desktop and mobile.
 
 ## Credits
 
